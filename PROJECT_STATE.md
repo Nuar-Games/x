@@ -4,7 +4,7 @@
 
 **X0 — Rulebook / Establishment**
 
-No gameplay implementation should begin until the establishment rules are consolidated and verified.
+X0 is not open-ended. Its exit criteria are defined in `PHASES_AND_WORKFLOW.md`.
 
 ## Project Identity
 
@@ -18,6 +18,7 @@ No gameplay implementation should begin until the establishment rules are consol
 - `PROJECT_CONSTITUTION.md` — non-negotiable development constraints
 - `GAME_RULES.md` — authoritative established game rules
 - `WORKING_PROTOCOL.md` — operating constraints for future work
+- `PHASES_AND_WORKFLOW.md` — mandatory development phases, hard exit criteria, and anti-endless-work rules
 - `PROJECT_STATE.md` — current project state
 
 ## Current Implementation State
@@ -50,9 +51,23 @@ No gameplay implementation should begin until the establishment rules are consol
 - Zone X score determines winner
 - simplified Mega X-derived tie-breaker
 
-## Next Legitimate Work
+## X0 Hard Exit
 
-1. Verify `GAME_RULES.md` against the creator's establishment decisions.
+X0 closes when:
+
+1. `PROJECT_CONSTITUTION.md` exists.
+2. `GAME_RULES.md` contains the established base rules.
+3. `WORKING_PROTOCOL.md` exists.
+4. `PHASES_AND_WORKFLOW.md` exists.
+5. This file records current state and next task.
+6. No known contradiction prevents implementation of the base engine.
+
+Once these conditions are verified, X0 must be marked **CLOSED** and work moves to **X1 — Headless Game Engine**. Optional polish or hypothetical edge cases may not keep X0 open.
+
+## Next Concrete Work
+
+1. Verify `GAME_RULES.md` against the creator's establishment decisions from this session.
 2. Amend only genuine inaccuracies or omissions.
-3. Once approved, create the initial architecture documents for X1 Engine.
-4. Do not build UI/backend/online systems before the rulebook gate passes.
+3. If no implementation-blocking contradiction remains, mark X0 **CLOSED**.
+4. Begin X1 by creating the headless engine architecture and implementation plan.
+5. Do not build UI/backend/online systems before the X1 engine gate passes.
