@@ -2,9 +2,18 @@
 
 ## Current Phase
 
-**X0 — Rulebook / Establishment**
+**X1 — Headless Game Engine**
 
-X0 is not open-ended. Its exit criteria are defined in `PHASES_AND_WORKFLOW.md`.
+X0 — Rulebook / Establishment is **CLOSED**.
+
+The establishment gate was closed after:
+- project constitution existed;
+- authoritative game rules were consolidated and verified against the establishment decisions;
+- working protocol existed;
+- phases/workflow with hard exit criteria existed;
+- no known contradiction remained that blocks implementation of the base engine.
+
+Do not reopen X0 for optional polish or hypothetical edge cases. Reopen only if a real contradiction, regression, or implementation blocker proves an establishment rule is insufficient or inconsistent.
 
 ## Project Identity
 
@@ -18,8 +27,10 @@ X0 is not open-ended. Its exit criteria are defined in `PHASES_AND_WORKFLOW.md`.
 - `PROJECT_CONSTITUTION.md` — non-negotiable development constraints
 - `GAME_RULES.md` — authoritative established game rules
 - `WORKING_PROTOCOL.md` — operating constraints for future work
-- `PHASES_AND_WORKFLOW.md` — mandatory development phases, hard exit criteria, and anti-endless-work rules
-- `PROJECT_STATE.md` — current project state
+- `PHASES_AND_WORKFLOW.md` — mandatory phase sequence, gates, hard stops, and work cycle
+- `PROJECT_STATE.md` — current milestone/status
+- `ARCHITECTURE.md` — to be created during X1
+- `DECISIONS.md` — to be created when the first architecture decision needs durable recording
 
 ## Current Implementation State
 
@@ -36,6 +47,7 @@ X0 is not open-ended. Its exit criteria are defined in `PHASES_AND_WORKFLOW.md`.
 - maximum 2 cards with the same name
 - every card can function as VS
 - VS ATK/DEF positioning
+- start-of-turn VS action is position change OR voluntary replacement, not both
 - Mega X-style STA capacity system
 - Effect Zone occupancy
 - Zone X capture scoring and absolute protection
@@ -51,23 +63,26 @@ X0 is not open-ended. Its exit criteria are defined in `PHASES_AND_WORKFLOW.md`.
 - Zone X score determines winner
 - simplified Mega X-derived tie-breaker
 
-## X0 Hard Exit
+## X0 Closure Record
 
-X0 closes when:
+X0 exit criteria are satisfied.
 
-1. `PROJECT_CONSTITUTION.md` exists.
-2. `GAME_RULES.md` contains the established base rules.
-3. `WORKING_PROTOCOL.md` exists.
-4. `PHASES_AND_WORKFLOW.md` exists.
-5. This file records current state and next task.
-6. No known contradiction prevents implementation of the base engine.
+Final rule verification found one wording mismatch in the previous `GAME_RULES.md`: start-of-turn VS replacement and position change were listed as separate actions. This was corrected to the established rule: choose at most one — change position OR voluntarily replace the current VS.
 
-Once these conditions are verified, X0 must be marked **CLOSED** and work moves to **X1 — Headless Game Engine**. Optional polish or hypothetical edge cases may not keep X0 open.
+No other known contradiction currently blocks implementation of the base headless engine.
 
-## Next Concrete Work
+## Current Required Work — X1
 
-1. Verify `GAME_RULES.md` against the creator's establishment decisions from this session.
-2. Amend only genuine inaccuracies or omissions.
-3. If no implementation-blocking contradiction remains, mark X0 **CLOSED**.
-4. Begin X1 by creating the headless engine architecture and implementation plan.
-5. Do not build UI/backend/online systems before the X1 engine gate passes.
+Build the headless deterministic rules engine before any UI, backend, networking, 3D, progression, or monetization work.
+
+Immediate sequence:
+1. Create `ARCHITECTURE.md` defining canonical serializable `GameState`, command-driven mutation, deterministic resolution, seeded randomness, and engine/module boundaries.
+2. Define the card data schema separately from rules logic.
+3. Define legal player command types and validation rules.
+4. Implement setup, draw, hand-cap enforcement, VS deployment, position/replacement timing, Effect Zone/STA capacity, battle resolution, round end, Arena Collapse, deck exhaustion, scoring, and tie-breaker.
+5. Add automated rule tests and deterministic golden-match fixtures as each subsystem is implemented.
+6. Do not proceed to X2 until all X1 exit criteria in `PHASES_AND_WORKFLOW.md` pass.
+
+## Next Concrete Task
+
+**Create the X1 engine architecture and implementation skeleton, then begin the deterministic core from setup/turn state.**
