@@ -118,17 +118,17 @@ Normal turn flow:
 
 1. Draw 1 card.
 2. Enforce the hand limit when applicable; discard first if over the limit.
-3. At the start of the turn, the player may voluntarily replace their current VS.
-4. At the start of the turn, a surviving VS may change between ATK and DEF position.
-5. Before playing new Effect cards, the player may voluntarily remove their own Effect cards.
-6. Play Effect cards during the player's own turn, limited by STA capacity and Effect Zone capacity.
-7. Attack or pass.
-8. Resolve all battle results fully.
-9. End the turn unless another explicit effect grants additional legal actions/attacks.
+3. At the start of the turn, choose at most one VS action: either change the surviving VS between ATK and DEF position, or voluntarily replace the current VS.
+4. Before playing new Effect cards, the player may voluntarily remove their own Effect cards.
+5. Play Effect cards during the player's own turn, limited by STA capacity and Effect Zone capacity.
+6. Attack or pass.
+7. Resolve all battle results fully.
+8. End the turn unless another explicit effect grants additional legal actions/attacks.
 
 ### Voluntary VS replacement
 
 - Allowed only at the start of the player's own turn.
+- It is the alternative to changing the current VS position that turn; the player does not do both as separate start-of-turn actions.
 - The current surviving VS is captured by the opponent into Zone X.
 - The player then deploys a new VS.
 
