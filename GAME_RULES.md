@@ -1,6 +1,8 @@
 # X — The Card Game: Authoritative Game Rules
 
-Status: **ESTABLISHMENT RULESET**
+Status: **ESTABLISHMENT RULESET — LOCKED FOR X1**
+
+Rules version: **0.1.0**
 
 This document records only rules explicitly established by the creator. No implementation may invent, reinterpret, or imply unstated game behavior.
 
@@ -16,21 +18,48 @@ Design intent:
 - explicit card text controls exceptions
 - Zone X is permanent score and is untouchable
 
-## 2. Deck Construction
+## 2. Deck Construction and Card Roles
 
 - Deck size: minimum 30 cards, maximum 50 cards.
 - Maximum 2 cards with the same name.
-- Every card can be deployed as a VS card.
 - Match effects cannot alter deck-construction limits.
+
+### Card roles
+
+There are no separate construction-level card types. Every card is a dual-use X card.
+
+Each card definition contains:
+- identity/name;
+- ATK;
+- DEF;
+- STA;
+- Effect text / structured Effect definition, if it has one.
+
+A card is used in one role at a time:
+- deployed from hand as the VS; or
+- played from hand into the Effect Zone to use its Effect.
+
+Every card can be deployed as a VS card.
+
+A card with no playable Effect definition cannot be played into the Effect Zone, but it can still be deployed as VS.
 
 ## 3. Starting Setup
 
 - Each player starts with 5 cards in hand.
 - No mulligan.
 - Each player draws 1 card on their turn.
-- The first round allows 6 cards in hand after the opening draw.
-- After the first round, hand size has a hard cap of 5.
+
+### Opening turn hand allowance
+
+- A player's **opening turn** is that player's first turn of the match.
+- On their opening turn, a player may hold 6 cards after drawing (Player 1 draws to 6 on their opening turn; Player 2 draws to 6 on their opening turn).
+- Starting from each player's second turn, hand size has a hard cap of 5.
 - If a player exceeds the hand limit after drawing, that player must discard down to the legal limit before taking other actions.
+
+"Opening turn" is the only term used for this allowance. It is not related to "round" (see §12).
+
+### Player order
+
 - In online play, the challenger is Player 1.
 - Outside online challenge flow, players may decide who is Player 1 by any method they want.
 
@@ -48,6 +77,7 @@ Design intent:
 ### Effect Zone
 
 - Effect cards are played into the Effect Zone.
+- Only a card with a playable Effect definition may be played into the Effect Zone (see §2).
 - Every Effect card occupies STA capacity while it remains there.
 - Maximum normal Effect Zone size is 5, subject to STA and explicit card effects.
 - One-shot Effects resolve once but remain in the Effect Zone, occupying STA, until round end or removal.
@@ -117,13 +147,23 @@ If a VS card's STA reaches 0:
 Normal turn flow:
 
 1. Draw 1 card.
-2. Enforce the hand limit when applicable; discard first if over the limit.
-3. At the start of the turn, choose at most one VS action: either change the surviving VS between ATK and DEF position, or voluntarily replace the current VS.
+2. Enforce the hand limit; discard first if over the limit.
+3. VS step:
+   - **If the player has no VS:** deploy one from hand in ATK or DEF position. This is required before Effect play or attack/pass.
+   - **If the player has a surviving VS:** choose at most one of:
+     - keep it as-is;
+     - change its position between ATK and DEF;
+     - voluntarily replace it (the old VS is captured into the opponent's Zone X, then a new VS is deployed in ATK or DEF).
 4. Before playing new Effect cards, the player may voluntarily remove their own Effect cards.
-5. Play Effect cards during the player's own turn, limited by STA capacity and Effect Zone capacity.
+5. Play Effect cards, limited by STA capacity and Effect Zone capacity.
 6. Attack or pass.
 7. Resolve all battle results fully.
-8. End the turn unless another explicit effect grants additional legal actions/attacks.
+8. Check Arena Collapse (§13).
+9. End the turn unless another explicit effect grants additional legal actions/attacks.
+
+A newly deployed or replacement VS chooses ATK or DEF when deployed. Its position is locked until its owner's next turn.
+
+A newly deployed VS may attack on the same turn if it is in ATK position and the opponent has a VS.
 
 ### Voluntary VS replacement
 
@@ -142,19 +182,19 @@ A card effect may instead send an Effect card to Zone Tepi without capture, but 
 
 ## 7. Opening Turns
 
-### Player 1
+### Player 1 — opening turn
 
-- Draws 1 card, allowing 6 cards during the first round.
+- Draws 1 card (may hold 6 cards this turn).
 - Deploys a VS card.
 - May play Effects according to STA.
 - Cannot attack while Player 2 has no VS card.
 
-### Player 2
+### Player 2 — opening turn
 
-- Draws 1 card, allowing 6 cards during the first round.
+- Draws 1 card (may hold 6 cards this turn).
 - Deploys a VS card.
 - May play Effects according to STA.
-- May attack or pass.
+- May attack (if in ATK position) or pass.
 
 ## 8. Position Changes
 
@@ -165,6 +205,7 @@ A card effect may instead send an Effect card to Zone Tepi without capture, but 
 
 ## 9. Attack Rules
 
+- Only a VS in ATK position can attack. A VS in DEF position cannot attack.
 - No attack can be declared without an opposing VS card.
 - No pass can be declared without the player having a VS card in their VS Zone.
 - A player may choose to attack or pass.
@@ -208,9 +249,10 @@ Attacker ATK < Defender DEF:
 - Attacker discards the top card of their own deck to Zone Tepi.
 - No VS is destroyed from this comparison.
 
-### DEF vs DEF
+### DEF attacker
 
-- No attack can be performed while both opposing VS cards are in DEF position.
+- A VS in DEF position cannot attack. There is no DEF-attacker case (DEF vs ATK or DEF vs DEF).
+- If both opposing VS cards are in DEF position, no attack is possible.
 - Players may still use legal Effects or change position at the normal start-of-turn timing.
 
 ## 11. Destruction and Capture Language
@@ -235,6 +277,8 @@ No destruction/capture may be inferred from wording that does not explicitly use
 
 ## 12. Round End
 
+Terminology: **"round"** refers only to the combat cycle that ends when a VS card is destroyed. It is not used for the opening-turn hand allowance (§3).
+
 A round ends when a VS card is destroyed.
 
 At round end:
@@ -256,14 +300,20 @@ An inactive turn is a turn in which:
 
 Changing VS position does not count as an action and does not reset the counter.
 
-After 3 consecutive inactive individual turns:
-- Arena Collapse activates;
-- both VS cards are sent to Zone Tepi, not Zone X;
-- all Effect cards for both players are sent to Zone Tepi;
-- no capture points are awarded for those cards;
-- the player whose turn caused the collapse continues and deploys a new VS.
+Arena Collapse is checked when the player would otherwise finish their turn. If that turn is the third consecutive inactive individual turn:
+
+1. Arena Collapse triggers immediately.
+2. Both VS cards are sent to Zone Tepi, not Zone X.
+3. All Effect cards for both players are sent to Zone Tepi.
+4. No capture points are awarded for those cards.
+5. The inactivity counter resets to 0.
+6. The player whose turn triggered the collapse immediately deploys a new VS in ATK or DEF position.
+7. That deployment is the only continuation after the collapse. The player does not play Effects or attack.
+8. The turn ends and normal turn order continues.
 
 Playing an Effect or performing an attack resets the consecutive inactivity sequence.
+
+Deploying a VS (including the post-collapse deployment) does not count as an action for Arena Collapse.
 
 Effects may explicitly add to, reduce, reset, freeze, or accelerate the Arena Collapse counter.
 
@@ -362,12 +412,16 @@ If both decks become empty from the same resolving Effect:
 
 ### Tie-breaker
 
-Established simplified tie-breaker:
-- if Zone X scores are tied, each player shuffles their deck;
-- each reveals the top card;
-- the player whose revealed card has the higher ATK wins.
+If Zone X scores are tied:
 
-This tie-breaker is inherited from the Mega X tie-breaker concept in simplified form. Implementation must not invent additional tie-breaker behavior without creator approval.
+1. Each player forms a tie-break pool from all cards they own that are not in Zone X (deck, hand, VS Zone, Effect Zone, Zone Tepi).
+2. Each player shuffles their pool.
+3. Each player reveals one card from their pool.
+4. The player whose revealed card has the higher **printed/base ATK** wins. Temporary modifiers do not apply.
+5. If ATK ties, each player reveals the next card from their remaining shuffled pool, and step 4 repeats.
+6. If the tie cannot be broken because a player has no card left to reveal, the match is a draw.
+
+Note: this keeps the "shuffle and reveal higher ATK" concept, but it is defined for X. It is not a copy of a verified Mega X implementation.
 
 ## 21. Anti-Solitaire Design Law
 

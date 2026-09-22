@@ -263,8 +263,6 @@ Every substantial task follows this sequence:
 - Do not claim progress without a corresponding repo change, verified test result, or documented decision.
 - Do not require the creator to repeatedly prompt the assistant to continue a task already in progress.
 
-# Current Required Transition
+# Current Phase
 
-The project is currently X0.
-
-When the X0 documents have been verified against the established rules and no implementation-blocking contradiction remains, X0 must be marked **CLOSED** in `PROJECT_STATE.md` and the next task must be **X1 — Headless Game Engine architecture and implementation**.
+See `PROJECT_STATE.md` for the current phase and next task. This document does not track status.

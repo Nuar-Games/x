@@ -85,7 +85,7 @@ Immutable card-set data should contain:
 - printed ATK
 - printed DEF
 - printed STA
-- effect definition(s)
+- effect definition(s), optional — a card without one cannot be played into the Effect Zone
 - rules/card-set version metadata
 
 ### Card Instance
@@ -188,14 +188,18 @@ Logical stages:
 
 - `TURN_START_DRAW`
 - `HAND_LIMIT_ENFORCEMENT`
-- `START_OF_TURN_VS_ACTION`
+- `REQUIRED_VS_DEPLOYMENT` (only when the player has no VS)
+- `START_OF_TURN_VS_ACTION` (only when the player has a surviving VS)
 - `EFFECT_ACTIONS`
 - `COMBAT_OR_PASS`
+- `ARENA_COLLAPSE_CHECK`
+- `POST_COLLAPSE_DEPLOYMENT` (only when collapse triggered; no Effects or attacks follow)
 - `TURN_END`
 
 Important rule lock:
 
 At `START_OF_TURN_VS_ACTION`, a player may choose at most one normal VS action:
+- keep it as-is;
 - change the surviving VS position; **or**
 - voluntarily replace the current VS.
 
@@ -289,7 +293,7 @@ All gameplay randomness must route through one deterministic RNG abstraction own
 Initial required random use:
 
 - deck shuffle
-- tie-breaker shuffle
+- tie-breaker pool shuffle (all owned cards not in Zone X)
 - future card effects only when explicitly defined
 
 No gameplay module may call uncontrolled random functions directly.

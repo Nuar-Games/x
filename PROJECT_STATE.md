@@ -32,6 +32,10 @@ Do not reopen X0 for optional polish or hypothetical edge cases. Reopen only if 
 - `DECISIONS.md` — durable architectural decisions and conflict resolutions
 - `PROJECT_STATE.md` — current milestone/status
 
+## Rules Version
+
+Current rules version: **0.1.0** (see `GAME_RULES.md` and D-005).
+
 ## Current Implementation State
 
 - X0 establishment is closed.
@@ -68,7 +72,11 @@ Do not reopen X0 for optional polish or hypothetical edge cases. Reopen only if 
 - anti-solitaire design law
 - deck exhaustion ends match after applicable resolution
 - Zone X score determines winner
-- simplified Mega X-derived tie-breaker
+- tie-breaker by shuffled non-Zone-X pool and printed ATK; unbreakable tie = draw
+- dual-use cards (VS or Effect role)
+- only ATK-position VS can attack
+- opening-turn 6-card hand allowance
+- Arena Collapse at end of third inactive turn, counter reset, deploy-only continuation
 
 ## X0 Closure Record
 
@@ -96,19 +104,32 @@ No other known contradiction currently blocks implementation of the base headles
 
 `DECISIONS.md` records that the authoritative early-phase order is X0 Rules -> X1 Headless Engine -> X2 Local 2D Arena. This resolves the conflicting early summary line in the constitution in favor of Rule 2, Rule 25, the Core Development Law, and the phase workflow.
 
+## Pre-X1 Audit Record
+
+The pre-X1 audit found six rules gaps and several repo issues. All are resolved:
+- rules gaps resolved in `GAME_RULES.md` 0.1.0 (D-005);
+- stale X0 transition text removed from `PHASES_AND_WORKFLOW.md`;
+- constitution development order corrected (D-006);
+- `BACKLOG.md`, `README.md`, `.gitignore` added.
+
+## Branch Workflow
+
+All X1 work happens on branches and merges into `main` (constitution Rule 18).
+
 ## Current Required Work — X1
 
 The next work is implementation, not more establishment.
 
 Immediate sequence:
-1. choose and record the implementation language/tooling only when code creation begins;
-2. create the engine source/test skeleton;
-3. implement serializable state and card models;
-4. implement deterministic RNG;
-5. implement match setup and opening draw;
-6. implement turn-state machine and hand-cap enforcement;
-7. continue through the X1 order defined in `ARCHITECTURE.md`;
-8. add tests as each subsystem is implemented.
+1. add the first engine-proof card set (8–12 cards, constitution Rule 7) as structured data;
+2. choose and record the implementation language/tooling only when code creation begins;
+3. create the engine source/test skeleton;
+4. implement serializable state and card models;
+5. implement deterministic RNG;
+6. implement match setup and opening draw;
+7. implement turn-state machine and hand-cap enforcement;
+8. continue through the X1 order defined in `ARCHITECTURE.md`;
+9. add tests as each subsystem is implemented.
 
 Do not proceed to X2 until all X1 exit criteria in `PHASES_AND_WORKFLOW.md` pass.
 

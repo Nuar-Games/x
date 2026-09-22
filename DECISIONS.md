@@ -78,3 +78,38 @@ Card definitions are structured data interpreted through reusable engine mechani
 Consequence:
 
 The first engine proof uses a small card set and grows only after reusable mechanics are stable.
+
+---
+
+## D-005 — Rules 0.1.0 Lock (X1 Blocker Resolutions)
+
+Status: **ACTIVE**
+
+Decision:
+
+The six rules gaps found in the pre-X1 audit are resolved in `GAME_RULES.md` version 0.1.0:
+
+1. **Terminology.** "Opening turn" = each player's first turn (6-card hand allowance). "Round" = only the combat cycle ending in VS destruction.
+2. **DEF cannot attack.** Only a VS in ATK position may attack.
+3. **Arena Collapse timing.** Checked at the end of the third consecutive inactive turn; counter resets to 0; triggering player deploys a new VS only, then the turn ends.
+4. **Tie-breaker.** Uses a shuffled pool of all owned cards not in Zone X, compared by printed/base ATK, repeating on ties; unbreakable tie = draw. Not claimed as inherited Mega X implementation.
+5. **Card roles.** Every card is dual-use (VS or Effect). No construction-level card types. Cards without a playable Effect cannot enter the Effect Zone.
+6. **Empty VS Zone.** A player with no VS must deploy one after hand-limit enforcement and before Effects or attack/pass.
+
+Reason:
+
+Each gap prevented deterministic engine implementation.
+
+Consequence:
+
+X0 rules gate is closed. Reopen only for a real contradiction found during implementation.
+
+---
+
+## D-006 — Constitution Development Order Corrected
+
+Status: **ACTIVE**
+
+Decision:
+
+The constitution's Development Order list now reads engine before local 2D arena, matching D-001. D-001 remains as the historical record of the conflict.
