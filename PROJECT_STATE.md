@@ -28,13 +28,20 @@ Do not reopen X0 for optional polish or hypothetical edge cases. Reopen only if 
 - `GAME_RULES.md` — authoritative established game rules
 - `WORKING_PROTOCOL.md` — operating constraints for future work
 - `PHASES_AND_WORKFLOW.md` — mandatory phase sequence, gates, hard stops, and work cycle
+- `ARCHITECTURE.md` — X1 engine boundaries, canonical state, commands, deterministic resolution, and implementation order
+- `DECISIONS.md` — durable architectural decisions and conflict resolutions
 - `PROJECT_STATE.md` — current milestone/status
-- `ARCHITECTURE.md` — to be created during X1
-- `DECISIONS.md` — to be created when the first architecture decision needs durable recording
 
 ## Current Implementation State
 
-- No game engine implemented yet.
+- X0 establishment is closed.
+- X1 architecture is defined.
+- Canonical serializable `GameState` requirements are defined.
+- Command-driven state mutation contract is defined.
+- Deterministic resolution and seeded RNG requirements are defined.
+- Card definitions vs card instances are separated architecturally.
+- Test layers and golden-match requirements are defined.
+- No executable game engine code exists yet.
 - No UI implemented yet.
 - No AI implemented yet.
 - No X Supabase backend created yet.
@@ -71,18 +78,40 @@ Final rule verification found one wording mismatch in the previous `GAME_RULES.m
 
 No other known contradiction currently blocks implementation of the base headless engine.
 
+## X1 Architecture Record
+
+`ARCHITECTURE.md` is now created and defines:
+- one serializable authoritative match state;
+- engine-owned zone transitions;
+- command validation instead of direct mutation;
+- deterministic resolution order;
+- controlled seeded randomness;
+- card data separate from mutable card instances;
+- explicit turn-state stages;
+- STA capacity enforcement;
+- Zone X invariants;
+- battle/effect resolver boundaries;
+- test architecture and golden matches;
+- implementation order for X1.
+
+`DECISIONS.md` records that the authoritative early-phase order is X0 Rules -> X1 Headless Engine -> X2 Local 2D Arena. This resolves the conflicting early summary line in the constitution in favor of Rule 2, Rule 25, the Core Development Law, and the phase workflow.
+
 ## Current Required Work — X1
 
-Build the headless deterministic rules engine before any UI, backend, networking, 3D, progression, or monetization work.
+The next work is implementation, not more establishment.
 
 Immediate sequence:
-1. Create `ARCHITECTURE.md` defining canonical serializable `GameState`, command-driven mutation, deterministic resolution, seeded randomness, and engine/module boundaries.
-2. Define the card data schema separately from rules logic.
-3. Define legal player command types and validation rules.
-4. Implement setup, draw, hand-cap enforcement, VS deployment, position/replacement timing, Effect Zone/STA capacity, battle resolution, round end, Arena Collapse, deck exhaustion, scoring, and tie-breaker.
-5. Add automated rule tests and deterministic golden-match fixtures as each subsystem is implemented.
-6. Do not proceed to X2 until all X1 exit criteria in `PHASES_AND_WORKFLOW.md` pass.
+1. choose and record the implementation language/tooling only when code creation begins;
+2. create the engine source/test skeleton;
+3. implement serializable state and card models;
+4. implement deterministic RNG;
+5. implement match setup and opening draw;
+6. implement turn-state machine and hand-cap enforcement;
+7. continue through the X1 order defined in `ARCHITECTURE.md`;
+8. add tests as each subsystem is implemented.
+
+Do not proceed to X2 until all X1 exit criteria in `PHASES_AND_WORKFLOW.md` pass.
 
 ## Next Concrete Task
 
-**Create the X1 engine architecture and implementation skeleton, then begin the deterministic core from setup/turn state.**
+**Begin executable X1 implementation: engine source/test skeleton, canonical state types, card models, deterministic RNG, and setup/turn-state tests.**
