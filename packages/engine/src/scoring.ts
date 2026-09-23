@@ -1,6 +1,8 @@
 import type { EngineEvent, MatchEndReason } from "./commands.ts";
 import { shuffle } from "./rng.ts";
-import type { CardInstanceId, GameState, PlayerId, Winner } from "./state.ts";
+import type { CardInstanceId, GameState, PlayerId } from "./state.ts";
+
+type ResolvedWinner = PlayerId | "DRAW";
 
 function ownedTieBreakPool(state: GameState, playerId: PlayerId): CardInstanceId[] {
   return Object.values(state.cardInstances)
@@ -17,10 +19,10 @@ function printedAtk(state: GameState, instanceId: CardInstanceId): number {
   return definition.atk;
 }
 
-function tieBreak(state: GameState, events: EngineEvent[]): { state: GameState; winner: Winner } {
+function tieBreak(state: GameState, events: EngineEvent[]): { state: GameState; winner: ResolvedWinner } {
   const p1 = shuffle(state.rng, ownedTieBreakPool(state, "P1"));
   const p2 = shuffle(p1.rng, ownedTieBreakPool(state, "P2"));
-  let next: GameState = { ...state, rng: p2.rng };
+  const next: GameState = { ...state, rng: p2.rng };
 
   for (let index = 0; ; index += 1) {
     const p1Card = p1.value[index];
@@ -44,7 +46,7 @@ export function scoreAndResolveMatch(state: GameState, events: EngineEvent[], re
   events.push({ type: "SCORE_CALCULATED", p1, p2 });
 
   let next = state;
-  let winner: Winner;
+  let winner: ResolvedWinner;
   if (p1 > p2) winner = "P1";
   else if (p2 > p1) winner = "P2";
   else {
