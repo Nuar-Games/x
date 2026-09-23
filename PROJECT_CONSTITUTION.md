@@ -246,6 +246,8 @@ A visual failure must not corrupt authoritative match state.
 
 A functional 2D implementation comes first.
 
+Amended by D-007: X2 may use a greybox 2.5D renderer (tilted camera, card planes) as long as it stays presentation-only. Final art, VFX and 3D avatars remain blocked until X6.
+
 Presentation must never become the foundation of gameplay correctness.
 
 ---

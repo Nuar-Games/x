@@ -86,6 +86,8 @@ Do not add UI, Supabase, accounts, online multiplayer, 3D, cosmetics, progressio
 
 ## X2 — Local 2D Arena
 
+Per D-007, the arena uses the greybox 2.5D Three.js renderer.
+
 ### Purpose
 Make the proven engine playable by two humans locally through a simple 2D interface.
 
