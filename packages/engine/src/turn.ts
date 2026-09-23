@@ -20,7 +20,7 @@ import type {
   TransitionResult
 } from "./commands.ts";
 import { effectCapacity } from "./effects.ts";
-import type { CardInstanceId, GameState, PlayerId, PlayerState, TurnStage } from "./state.ts";
+import type { GameState, PlayerId, PlayerState, TurnStage } from "./state.ts";
 import { moveCard } from "./zones.ts";
 
 export const OPENING_TURN_HAND_LIMIT = 6;
