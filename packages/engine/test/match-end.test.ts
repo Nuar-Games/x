@@ -4,7 +4,7 @@ import { resolveBattle } from "../src/battle.ts";
 import { scoreAndResolveMatch } from "../src/scoring.ts";
 import { moveCard } from "../src/zones.ts";
 import { testInput } from "./fixtures.ts";
-import { setupTestMatch, withPlayer } from "./helpers/setup-test-match.ts";
+import { setupTestMatch } from "./helpers/setup-test-match.ts";
 
 function moveAllDeckToTepi(state: GameState, playerId: "P1" | "P2"): GameState {
   let next = state;
