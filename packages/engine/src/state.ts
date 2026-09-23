@@ -120,4 +120,6 @@ export interface GameState {
   readonly pendingResolution: PendingResolutionState | null;
   /** Number of Effect cards played by the active player this turn. Reset at turn start. */
   readonly effectCardsPlayedThisTurn: number;
+  /** Number of attacks declared by the active player this turn. Reset at turn start. */
+  readonly attacksThisTurn: number;
 }

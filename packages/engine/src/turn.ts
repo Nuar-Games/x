@@ -14,7 +14,7 @@ import { discardForHandLimit } from "./handlers/hand.ts";
 import { handLimitFor, isOpeningTurn } from "./hand-limit.ts";
 import { opponentOf, setStage, type HandlerResult } from "./internal/turn-helpers.ts";
 import type { GameState, PlayerState, TurnStage } from "./state.ts";
-import { moveCard } from "./zones.ts";
+import { moveCard, moveCardsSimultaneously, type MoveCardInput } from "./zones.ts";
 
 export { handLimitFor, isOpeningTurn, HAND_LIMIT, OPENING_TURN_HAND_LIMIT } from "./hand-limit.ts";
 export { opponentOf } from "./internal/turn-helpers.ts";
@@ -27,7 +27,7 @@ function stageAfterHandLimit(player: PlayerState): TurnStage {
 function runTurnStartDraw(state: GameState, events: EngineEvent[]): GameState {
   const playerId = state.activePlayerId;
   const started: PlayerState = { ...state.players[playerId], turnsStarted: state.players[playerId].turnsStarted + 1 };
-  let next: GameState = { ...state, effectCardsPlayedThisTurn: 0, players: { ...state.players, [playerId]: started } };
+  let next: GameState = { ...state, effectCardsPlayedThisTurn: 0, attacksThisTurn: 0, players: { ...state.players, [playerId]: started } };
   events.push({ type: "TURN_STARTED", playerId, turnNumber: state.turnNumber, isOpeningTurn: isOpeningTurn(started) });
 
   const drawnId = started.deck[0];
@@ -51,9 +51,42 @@ function runHandLimitCheck(state: GameState, events: EngineEvent[]): GameState |
   return null;
 }
 
-/** Arena Collapse is X1 step 12. Until then this check always passes straight to turn end. */
+/** GAME_RULES.md §13: the third consecutive inactive individual turn collapses the Arena. */
 function runArenaCollapseCheck(state: GameState, events: EngineEvent[]): GameState {
-  return setStage(state, "TURN_END", events);
+  const meaningfulAction = state.attacksThisTurn > 0 || state.effectCardsPlayedThisTurn > 0;
+  if (meaningfulAction) {
+    return setStage({ ...state, arenaCollapseInactiveTurns: 0 }, "TURN_END", events);
+  }
+
+  const inactiveTurns = state.arenaCollapseInactiveTurns + 1;
+  if (inactiveTurns < 3) {
+    return setStage({ ...state, arenaCollapseInactiveTurns: inactiveTurns }, "TURN_END", events);
+  }
+
+  events.push({ type: "ARENA_COLLAPSED", triggeringPlayerId: state.activePlayerId, inactiveTurns });
+  const moves: MoveCardInput[] = [];
+  for (const playerId of ["P1", "P2"] as const) {
+    const player = state.players[playerId];
+    if (player.vs !== null) {
+      moves.push({
+        instanceId: player.vs,
+        fromPlayerId: playerId,
+        from: "VS",
+        toPlayerId: playerId,
+        to: "ZONE_TEPI",
+        reason: "ARENA_COLLAPSE"
+      });
+    }
+  }
+  for (const playerId of ["P1", "P2"] as const) {
+    for (const instanceId of state.players[playerId].effectZone) {
+      moves.push({ instanceId, fromPlayerId: playerId, from: "EFFECT", toPlayerId: playerId, to: "ZONE_TEPI", reason: "ARENA_COLLAPSE" });
+    }
+  }
+
+  let next = moveCardsSimultaneously({ ...state, arenaCollapseInactiveTurns: 0 }, moves, events);
+  next = setStage(next, "POST_COLLAPSE_DEPLOYMENT", events);
+  return next;
 }
 
 /** Ends the turn: "this turn" modifiers expire, then the other player's turn starts. */

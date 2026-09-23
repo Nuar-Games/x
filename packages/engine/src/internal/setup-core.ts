@@ -135,6 +135,7 @@ export function buildInitialState(input: MatchSetupInput): GameState {
     activeContinuousEffectIds: [],
     ruleModifiers: [],
     pendingResolution: null,
-    effectCardsPlayedThisTurn: 0
+    effectCardsPlayedThisTurn: 0,
+    attacksThisTurn: 0
   };
 }

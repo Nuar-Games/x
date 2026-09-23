@@ -89,7 +89,8 @@ export type MoveReason =
   | "BATTLE_DESTROYED"
   | "BATTLE_TOP_DECK_CAPTURE"
   | "BATTLE_TOP_DECK_DISCARD"
-  | "ROUND_END_CLEAR";
+  | "ROUND_END_CLEAR"
+  | "ARENA_COLLAPSE";
 
 export type RejectionCode =
   | "MATCH_NOT_ACTIVE"
@@ -130,6 +131,7 @@ export type EngineEvent =
       readonly reason: MoveReason;
     }
   | { readonly type: "ROUND_ENDED"; readonly roundNumber: number }
+  | { readonly type: "ARENA_COLLAPSED"; readonly triggeringPlayerId: PlayerId; readonly inactiveTurns: number }
   | { readonly type: "ATTACK_DECLARED"; readonly playerId: PlayerId }
   | { readonly type: "PASSED"; readonly playerId: PlayerId }
   | {

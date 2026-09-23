@@ -13,7 +13,8 @@ export function attack(state: GameState, command: AttackCommand): HandlerResult 
   if (state.players[opponentOf(command.playerId)].vs === null) return reject("NO_OPPONENT_VS");
 
   const events: EngineEvent[] = [{ type: "ATTACK_DECLARED", playerId: command.playerId }];
-  let next = setStage(state, "COMBAT_OR_PASS", events);
+  let next: GameState = { ...state, attacksThisTurn: state.attacksThisTurn + 1 };
+  next = setStage(next, "COMBAT_OR_PASS", events);
   next = resolveBattle(next, command.playerId, events);
   next = setStage(next, "ARENA_COLLAPSE_CHECK", events);
   return accept(next, events);

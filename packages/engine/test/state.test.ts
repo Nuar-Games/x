@@ -37,7 +37,8 @@ describe("canonical GameState", () => {
       activeContinuousEffectIds: [],
       ruleModifiers: [],
       pendingResolution: null,
-      effectCardsPlayedThisTurn: 0
+      effectCardsPlayedThisTurn: 0,
+      attacksThisTurn: 0
     };
 
     expect(JSON.parse(JSON.stringify(state))).toEqual(state);
