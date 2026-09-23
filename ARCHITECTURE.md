@@ -296,6 +296,20 @@ The engine needs a reusable mechanic vocabulary for the rules X actually uses, s
 
 No mechanic may silently imply destruction, capture, targeting, duration, destination, or reveal behavior not present in card text/rules.
 
+### One effect vocabulary (D-016)
+
+`src/effect-spec.ts` (`parseEffectSpec`) is the single definition of which effects the engine can run. Card data is input to it, not a second definition. Setup parses every deck card's raw `effect` JSON; an unknown family or any unexpected field rejects the deck with the card's name. An unsupported card can never enter a match and silently do nothing.
+
+The match snapshot holds only the card definitions the decks use, with parsed effects. A card can be played as an Effect only if it has one.
+
+### Resolution order
+
+Instructions apply in written order. STA reaching 0 destroys the VS immediately, mid-effect. STA capacity is recalculated once, after every instruction has applied; any excess is chosen by the player whose effect caused it (GAME_RULES.md §5, §18A KAPORES).
+
+### Real-card tests
+
+Engine tests load the real card data from `@x/cards` (a test-only dev dependency; engine source never imports it). Every card in `engine-proof.json` has an executable test matching `card-effect-cases`, and a coverage test fails if one is missing.
+
 One-shot Effects resolve once then remain in Effect Zone occupying STA until removed or round end.
 
 Continuous Effects derive their current impact from active Effect Zone state.

@@ -22,12 +22,10 @@ function playerForVs(state: GameState, instanceId: CardInstanceId): PlayerId | n
   return null;
 }
 
-function nextStatOrder(state: GameState): number {
-  return state.statModifiers.reduce((max, modifier) => Math.max(max, modifier.order), 0) + 1;
-}
-
-function nextRuleId(state: GameState, sourceInstanceId: CardInstanceId, kind: string): string {
-  return `${sourceInstanceId}:${kind}:${state.ruleModifiers.length + 1}`;
+/** Takes the next modifier number. Ids and stat order are never reused, even after removal. */
+function takeSequence(state: GameState): { state: GameState; sequence: number } {
+  const sequence = state.modifierSequence + 1;
+  return { state: { ...state, modifierSequence: sequence }, sequence };
 }
 
 function markSourceContinuous(state: GameState, sourceInstanceId: CardInstanceId): GameState {
@@ -72,44 +70,41 @@ function pauseForChoice(
   };
 }
 
-function enforceStaConsequences(
+/** GAME_RULES.md §5: a VS whose STA reaches 0 is destroyed immediately, mid-effect. */
+function destroyVsAtZeroSta(state: GameState, targetInstanceId: CardInstanceId, events: EngineEvent[]): GameState {
+  const affectedPlayerId = playerForVs(state, targetInstanceId);
+  if (affectedPlayerId === null || effectiveStat(state, targetInstanceId, "STA") !== 0) return state;
+  return moveCard(
+    state,
+    {
+      instanceId: targetInstanceId,
+      fromPlayerId: affectedPlayerId,
+      from: "VS",
+      toPlayerId: opponentOf(affectedPlayerId),
+      to: "ZONE_X",
+      reason: "EFFECT_DESTROYED"
+    },
+    events
+  );
+}
+
+/**
+ * GAME_RULES.md §5 / §18A (KAPORES): STA capacity is recalculated once, after
+ * every instruction of the effect has been applied. If a player now holds
+ * more Effect cards than their VS allows, the player whose effect caused it
+ * chooses which cards go to Zone Tepi.
+ */
+function checkCapacityAfterEffect(
   state: GameState,
   sourceInstanceId: CardInstanceId,
   actingPlayerId: PlayerId,
-  targetInstanceId: CardInstanceId,
-  remainingSteps: readonly EffectSpec[],
   events: EngineEvent[]
 ): GameState {
-  const affectedPlayerId = playerForVs(state, targetInstanceId);
-  if (affectedPlayerId === null) return state;
-
-  if (effectiveStat(state, targetInstanceId, "STA") === 0) {
-    return moveCard(
-      state,
-      {
-        instanceId: targetInstanceId,
-        fromPlayerId: affectedPlayerId,
-        from: "VS",
-        toPlayerId: opponentOf(affectedPlayerId),
-        to: "ZONE_X",
-        reason: "EFFECT_DESTROYED"
-      },
-      events
-    );
-  }
-
-  const excess = requiredExcessEffectCount(state, affectedPlayerId);
-  if (excess > 0) {
-    return pauseForChoice(
-      state,
-      sourceInstanceId,
-      actingPlayerId,
-      "REMOVE_EXCESS_EFFECTS",
-      excess,
-      affectedPlayerId,
-      remainingSteps,
-      events
-    );
+  for (const playerId of [actingPlayerId, opponentOf(actingPlayerId)]) {
+    const excess = requiredExcessEffectCount(state, playerId);
+    if (excess > 0) {
+      return pauseForChoice(state, sourceInstanceId, actingPlayerId, "REMOVE_EXCESS_EFFECTS", excess, playerId, [], events);
+    }
   }
   return state;
 }
@@ -119,12 +114,12 @@ function addStatModifier(
   sourceInstanceId: CardInstanceId,
   actingPlayerId: PlayerId,
   spec: Extract<EffectSpec, { family: "SET_STAT" | "MODIFY_STAT" }>,
-  remainingSteps: readonly EffectSpec[],
   events: EngineEvent[]
 ): GameState {
   const targetInstanceId = targetVs(state, actingPlayerId, spec.target);
   if (targetInstanceId === null) return state;
-  const order = nextStatOrder(state);
+  const taken = takeSequence(state);
+  const order = taken.sequence;
   const duration = spec.duration ?? "WHILE_SOURCE_ACTIVE";
   const modifier: StatModifier = spec.family === "SET_STAT"
     ? {
@@ -148,9 +143,9 @@ function addStatModifier(
         value: spec.delta
       };
 
-  let next: GameState = { ...state, statModifiers: [...state.statModifiers, modifier] };
+  let next: GameState = { ...taken.state, statModifiers: [...taken.state.statModifiers, modifier] };
   if (duration === "WHILE_SOURCE_ACTIVE") next = markSourceContinuous(next, sourceInstanceId);
-  if (spec.stat === "STA") next = enforceStaConsequences(next, sourceInstanceId, actingPlayerId, targetInstanceId, remainingSteps, events);
+  if (spec.stat === "STA") next = destroyVsAtZeroSta(next, targetInstanceId, events);
   return next;
 }
 
@@ -188,7 +183,7 @@ function resolveNormalizedSteps(
 
       case "SET_STAT":
       case "MODIFY_STAT":
-        next = addStatModifier(next, sourceInstanceId, actingPlayerId, step, remainingSteps, events);
+        next = addStatModifier(next, sourceInstanceId, actingPlayerId, step, events);
         break;
 
       case "DESTROY_ALL": {
@@ -224,12 +219,13 @@ function resolveNormalizedSteps(
 
       case "BLOCK_ATTACKS": {
         const affectedPlayerId = opponentOf(actingPlayerId);
+        const taken = takeSequence(next);
         next = {
-          ...next,
+          ...taken.state,
           ruleModifiers: [
-            ...next.ruleModifiers,
+            ...taken.state.ruleModifiers,
             {
-              id: nextRuleId(next, sourceInstanceId, "attack"),
+              id: `${sourceInstanceId}:rule:${taken.sequence}`,
               sourceInstanceId,
               affectedPlayerId,
               kind: "ATTACK_RESTRICTION",
@@ -257,7 +253,8 @@ function resolveNormalizedSteps(
     }
   }
 
-  return next;
+  if (next.pendingResolution !== null) return next;
+  return checkCapacityAfterEffect(next, sourceInstanceId, actingPlayerId, events);
 }
 
 export function resolveCardEffect(

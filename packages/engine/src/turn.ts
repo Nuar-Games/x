@@ -84,9 +84,14 @@ function runArenaCollapseCheck(state: GameState, events: EngineEvent[]): GameSta
     }
   }
 
-  let next = moveCardsSimultaneously({ ...state, arenaCollapseInactiveTurns: 0 }, moves, events);
-  next = setStage(next, "POST_COLLAPSE_DEPLOYMENT", events);
-  return next;
+  const next = moveCardsSimultaneously({ ...state, arenaCollapseInactiveTurns: 0 }, moves, events);
+
+  // GAME_RULES.md §13 step 6 (D-015): no card in hand means the deployment is skipped and the turn ends.
+  if (next.players[state.activePlayerId].hand.length === 0) {
+    events.push({ type: "POST_COLLAPSE_DEPLOYMENT_SKIPPED", playerId: state.activePlayerId });
+    return setStage(next, "TURN_END", events);
+  }
+  return setStage(next, "POST_COLLAPSE_DEPLOYMENT", events);
 }
 
 /** Ends the turn: "this turn" modifiers expire, then the other player's turn starts. */

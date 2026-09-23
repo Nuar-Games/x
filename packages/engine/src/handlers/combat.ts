@@ -25,13 +25,14 @@ export function attack(state: GameState, command: AttackCommand): HandlerResult 
   if (player.vsPosition !== "ATK") return reject("VS_NOT_IN_ATK_POSITION");
   if (state.players[opponentOf(command.playerId)].vs === null) return reject("NO_OPPONENT_VS");
 
-  const events: EngineEvent[] = [{ type: "ATTACK_DECLARED", playerId: command.playerId }];
+  const events: EngineEvent[] = [{ type: "ATTACK_ATTEMPTED", playerId: command.playerId }];
   const prevented = consumeAttackRestriction(state, command.playerId, events);
   if (prevented !== null) {
     const next = setStage(prevented, "ARENA_COLLAPSE_CHECK", events);
     return accept(next, events);
   }
 
+  // Only an attack that proceeds to battle counts as "an attack occurred" for Arena Collapse (D-015).
   let next: GameState = { ...state, attacksThisTurn: state.attacksThisTurn + 1 };
   next = setStage(next, "COMBAT_OR_PASS", events);
   next = resolveBattle(next, command.playerId, events);

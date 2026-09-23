@@ -70,9 +70,8 @@ export interface CardDefinitionSnapshot {
   readonly atk: number;
   readonly def: number;
   readonly sta: number;
-  readonly hasPlayableEffect: boolean;
+  /** Parsed at setup by parseEffectSpec. A card without one cannot be played into the Effect Zone (GAME_RULES.md §2). */
   readonly effect?: EffectSpec;
-  readonly status?: "DEFERRED";
 }
 
 export interface CardInstance {
@@ -153,6 +152,11 @@ export interface GameState {
   readonly pendingResolution: PendingResolutionState | null;
   /** Number of Effect cards played by the active player this turn. Reset at turn start. */
   readonly effectCardsPlayedThisTurn: number;
-  /** Number of attacks declared by the active player this turn. Reset at turn start. */
+  /**
+   * Attacks that actually proceeded to battle this turn. A prevented attack
+   * attempt does not count (GAME_RULES.md §13, D-015). Reset at turn start.
+   */
   readonly attacksThisTurn: number;
+  /** Monotonic counter for stat/rule modifier ids and stat order. Never reused. */
+  readonly modifierSequence: number;
 }

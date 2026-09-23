@@ -265,3 +265,29 @@ Decision (from the step 9 audit):
 9. **Duplicate logic removed** (Effect-source cleanup, slot-limit calculation).
 10. **Public API narrowed** to setup, advance, applyCommand, derived reads and types.
 11. **Lockfile restored.** CI installs with `--frozen-lockfile` and caches pnpm.
+
+---
+
+## D-015 — Prevented Attacks and Empty-Hand Collapse
+
+Status: **ACTIVE**
+
+Decision:
+
+1. **A prevented attack is not an attack for Arena Collapse.** The attempt consumes the restriction, but no attack occurs, so the inactivity counter is not reset. Events keep this explicit: `ATTACK_ATTEMPTED` and `ATTACK_PREVENTED` are distinct from `BATTLE_RESOLVED`, and `attacksThisTurn` counts only attacks that reach battle.
+2. **No card to deploy after a collapse:** the post-collapse deployment is skipped (`POST_COLLAPSE_DEPLOYMENT_SKIPPED`) and the turn ends. The player deploys normally on their next turn. The match can never wait for an impossible deployment.
+
+Recorded in `GAME_RULES.md` §13 (rules 0.2.2).
+
+---
+
+## D-016 — Step 13.5: Real Cards Through the Engine
+
+Status: **ACTIVE**
+
+Decision (from the step 13 audit):
+
+1. **One effect vocabulary.** `parseEffectSpec` is the only definition of runnable effects. Setup rejects any deck card whose effect is unsupported or has unexpected fields. `hasPlayableEffect` is removed; a card is playable as an Effect exactly when it has a parsed effect.
+2. **Real-card tests.** All 10 engine-proof cards run through `applyCommand` using the real card data, with a coverage test.
+3. **KAPORES order.** STA 0 destruction stays immediate; the capacity check runs once after all instructions of the effect.
+4. **Monotonic modifier ids** (`modifierSequence`), never reused after removal.

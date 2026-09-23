@@ -118,7 +118,8 @@ describe("PLAY_EFFECT", () => {
     const state = effectStage(3);
     const card = state.players.P1.hand[0]!;
     const definitionId = state.cardInstances[card]!.definitionId;
-    const noEffect = { ...state, cardDefinitions: { ...state.cardDefinitions, [definitionId]: { ...state.cardDefinitions[definitionId]!, hasPlayableEffect: false } } };
+    const { effect: _removed, ...withoutEffect } = state.cardDefinitions[definitionId]!;
+    const noEffect = { ...state, cardDefinitions: { ...state.cardDefinitions, [definitionId]: withoutEffect } };
     expect(applyCommand(noEffect, { type: "PLAY_EFFECT", playerId: "P1", cardInstanceId: card })).toMatchObject({ accepted: false, code: "CARD_HAS_NO_EFFECT" });
   });
 });

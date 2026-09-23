@@ -20,3 +20,4 @@ export type { RngState, RngResult } from "./rng.ts";
 export { setupMatch, MIN_DECK_SIZE, MAX_DECK_SIZE, type MatchSetupInput, type SetupCardDefinition } from "./setup.ts";
 export { advance, applyCommand, handLimitFor, isOpeningTurn, opponentOf, HAND_LIMIT, OPENING_TURN_HAND_LIMIT } from "./turn.ts";
 export { effectiveStats, effectiveStat, effectCapacity, effectSlotLimit, NORMAL_EFFECT_ZONE_LIMIT } from "./effects.ts";
+export { parseEffectSpec, type ParseResult } from "./effect-spec.ts";

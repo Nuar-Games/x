@@ -2,13 +2,15 @@
  * Shared match-construction core.
  *
  * Contains only the checks that apply to every match, including test
- * fixtures: known card definitions, no deferred cards, max 2 copies per name.
+ * fixtures: known card definitions, no deferred cards, every deck card's
+ * effect is one the engine implements (parseEffectSpec), max 2 copies per name.
  *
  * The 30–50 deck-size rule is NOT here. It lives only in `setupMatch`
  * (setup.ts), so there is no switch, flag or parameter anywhere in
  * production code that disables it (D-010).
  */
 import { RULES_VERSION } from "../version.ts";
+import { parseEffectSpec } from "../effect-spec.ts";
 import { createRng, shuffle, type RngState } from "../rng.ts";
 import type {
   CardDefinitionSnapshot,
@@ -20,7 +22,20 @@ import type {
   PlayerState
 } from "../state.ts";
 
-export interface SetupCardDefinition extends CardDefinitionSnapshot {}
+/**
+ * A card definition as it arrives from card data. Extra fields (e.g. `no`,
+ * `star`, `effectText`) are ignored. `effect` is raw JSON: setup parses it.
+ */
+export interface SetupCardDefinition {
+  readonly id: string;
+  readonly name: string;
+  readonly atk: number;
+  readonly def: number;
+  readonly sta: number;
+  readonly effect?: unknown;
+  /** "DEFERRED" cards are not implemented and can never enter a match (GAME_RULES.md §18A). */
+  readonly status?: "DEFERRED" | undefined;
+}
 
 export interface MatchSetupInput {
   readonly matchId: MatchId;
@@ -59,6 +74,10 @@ function validateDeckContents(
     const definition = definitions.get(definitionId);
     if (!definition) throw new Error(`${label} contains unknown card definition: ${definitionId}`);
     if (definition.status === "DEFERRED") throw new Error(`${label} contains deferred card: ${definition.name}`);
+    if (definition.effect !== undefined) {
+      const parsed = parseEffectSpec(definition.effect);
+      if (!parsed.ok) throw new Error(`${label} contains ${definition.name}, whose effect the engine cannot run yet: ${parsed.reason}`);
+    }
     const count = (copiesByName.get(definition.name) ?? 0) + 1;
     if (count > MAX_COPIES_PER_NAME) throw new Error(`${label} cannot contain more than 2 copies of ${definition.name}`);
     copiesByName.set(definition.name, count);
@@ -97,6 +116,27 @@ function dealOpeningHand(
   };
 }
 
+/** Snapshots only the definitions the decks use, with parsed effects. */
+function snapshotDefinitions(
+  definitions: ReadonlyMap<string, SetupCardDefinition>,
+  decks: readonly (readonly string[])[]
+): Record<string, CardDefinitionSnapshot> {
+  const used = [...new Set(decks.flat())].sort();
+  const snapshot: Record<string, CardDefinitionSnapshot> = {};
+  for (const id of used) {
+    const definition = definitions.get(id)!;
+    const base = { id: definition.id, name: definition.name, atk: definition.atk, def: definition.def, sta: definition.sta };
+    if (definition.effect === undefined) {
+      snapshot[id] = base;
+    } else {
+      const parsed = parseEffectSpec(definition.effect);
+      if (!parsed.ok) throw new Error(parsed.reason);
+      snapshot[id] = { ...base, effect: parsed.spec };
+    }
+  }
+  return snapshot;
+}
+
 /** Builds the initial match state. Callers add any extra deck rules before calling. */
 export function buildInitialState(input: MatchSetupInput): GameState {
   const definitions = definitionMap(input.cardDefinitions);
@@ -129,13 +169,14 @@ export function buildInitialState(input: MatchSetupInput): GameState {
       P1: dealOpeningHand("P1", p1Shuffle.value, cardInstances),
       P2: dealOpeningHand("P2", p2Shuffle.value, cardInstances)
     },
-    cardDefinitions: Object.fromEntries(input.cardDefinitions.map((definition) => [definition.id, definition])),
+    cardDefinitions: snapshotDefinitions(definitions, [input.player1Deck, input.player2Deck]),
     cardInstances,
     statModifiers: [],
     activeContinuousEffectIds: [],
     ruleModifiers: [],
     pendingResolution: null,
     effectCardsPlayedThisTurn: 0,
-    attacksThisTurn: 0
+    attacksThisTurn: 0,
+    modifierSequence: 0
   };
 }

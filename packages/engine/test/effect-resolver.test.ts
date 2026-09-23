@@ -47,7 +47,7 @@ function withEffect(state: GameState, spec: EffectSpec): { state: GameState; car
       ...state,
       cardDefinitions: {
         ...state.cardDefinitions,
-        [definitionId]: { ...state.cardDefinitions[definitionId]!, hasPlayableEffect: true, effect: spec }
+        [definitionId]: { ...state.cardDefinitions[definitionId]!, effect: spec }
       }
     }
   };
@@ -159,5 +159,25 @@ describe("effect resolver primitives", () => {
     const chosen = result.state.players.P1.hand[0]!;
     const rejected = applyCommand(result.state, { type: "RESOLVE_EFFECT_CHOICE", playerId: "P1", cardInstanceIds: [chosen] });
     expect(rejected).toEqual({ accepted: false, state: result.state, code: "WRONG_EFFECT_CHOICE_COUNT" });
+  });
+});
+
+describe("modifier ids (step 13.5)", () => {
+  it("are never reused after a modifier is removed", async () => {
+    const { proofMatch, setVs, playCard } = await import("./helpers/real-cards.ts");
+    let state = setVs(setVs(proofMatch(), "P1", "X002"), "P2", "X013");
+    const naga1 = playCard(state, "P1", "X013");
+    state = naga1.state;
+    const firstId = state.ruleModifiers.find((m) => m.kind === "ATTACK_RESTRICTION")!.id;
+    // Consume it, then create another from a second NAGA.
+    const { applyCommand } = await import("../src/index.ts");
+    const attacked = applyCommand({ ...state, activePlayerId: "P2", turnStage: "EFFECT_ACTIONS", attacksThisTurn: 0, effectCardsPlayedThisTurn: 0 }, { type: "ATTACK", playerId: "P2" });
+    if (!attacked.accepted) throw new Error(attacked.code);
+    expect(attacked.state.ruleModifiers).toHaveLength(0);
+    const again = playCard(attacked.state, "P1", "X013").state;
+    const secondId = again.ruleModifiers.find((m) => m.kind === "ATTACK_RESTRICTION")!.id;
+    expect(secondId).not.toBe(firstId);
+    const allIds = [...again.statModifiers.map((m) => m.id), ...again.ruleModifiers.map((m) => m.id)];
+    expect(new Set(allIds).size).toBe(allIds.length);
   });
 });

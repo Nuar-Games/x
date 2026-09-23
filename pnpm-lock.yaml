@@ -49,7 +49,11 @@ importers:
         specifier: ^3.23.8
         version: 3.25.76
 
-  packages/engine: {}
+  packages/engine:
+    devDependencies:
+      '@x/cards':
+        specifier: workspace:*
+        version: link:../cards
 
 packages:
 
@@ -241,7 +245,7 @@ packages:
     os: [linux]
 
   '@rollup/rollup-linux-arm64-gnu@4.63.4':
-    resolution: {integrity: sha512-VcQ3L1tjnkKzWjryAVaFhHEWcqOfICX9uxVVoDzm2t0DpgKRHd2zOpVrJc0xsWeBZcBFyROCIBdyR/fS174pg==}
+    resolution: {integrity: sha512-VcQ3L1tjnkKzWjryAVaFhHEWcqOfICX9uxVVoDzm2t0DpgKRHd2zOpVrJc0xsWeBZcBFyYROCIBdyR/fS174pg==}
     cpu: [arm64]
     os: [linux]
 
