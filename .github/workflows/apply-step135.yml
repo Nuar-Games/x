@@ -20,8 +20,11 @@ jobs:
       - name: Verify and apply supplied step 13.5 patch
         shell: bash
         run: |
+          sha256sum .step135/part2a.b64 .step135/part2b.b64 .step135/part2c.b64
+          test "$(sha256sum .step135/part2a.b64 | cut -d' ' -f1)" = "76167999fa8f750b0a98785317be097f73bebdb886dec7ec417952998cca0338"
+          test "$(sha256sum .step135/part2b.b64 | cut -d' ' -f1)" = "6fa21200c3ac0eaae7ca8dda50aed2e0a70d30e4b8abdeac5692e5d7b9da8c77"
+          test "$(sha256sum .step135/part2c.b64 | cut -d' ' -f1)" = "d0003b0865f90909c764aeb3a0fcc17a3748fc240f544388b001c786a47be2dd"
           cat .step135/part0.b64 .step135/part1.b64 .step135/part2a.b64 .step135/part2b.b64 .step135/part2c.b64 .step135/part3.b64 .step135/part4.b64 | base64 -d > /tmp/x1-step-13-5.patch
-          sha256sum /tmp/x1-step-13-5.patch
           test "$(sha256sum /tmp/x1-step-13-5.patch | cut -d' ' -f1)" = "585072cf0b71871a328abe7e3ad87fcd5aa7d20bf159b29257d1b99dae9dec39"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
