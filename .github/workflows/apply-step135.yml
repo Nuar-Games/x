@@ -20,11 +20,12 @@ jobs:
       - name: Verify and apply supplied step 13.5 patch
         shell: bash
         run: |
-          sha256sum .step135/part2a.b64 .step135/part2b.b64 .step135/part2c.b64
           test "$(sha256sum .step135/part2a.b64 | cut -d' ' -f1)" = "76167999fa8f750b0a98785317be097f73bebdb886dec7ec417952998cca0338"
           test "$(sha256sum .step135/part2b.b64 | cut -d' ' -f1)" = "6fa21200c3ac0eaae7ca8dda50aed2e0a70d30e4b8abdeac5692e5d7b9da8c77"
-          test "$(sha256sum .step135/part2c.b64 | cut -d' ' -f1)" = "d0003b0865f90909c764aeb3a0fcc17a3748fc240f544388b001c786a47be2dd"
-          cat .step135/part0.b64 .step135/part1.b64 .step135/part2a.b64 .step135/part2b.b64 .step135/part2c.b64 .step135/part3.b64 .step135/part4.b64 | base64 -d > /tmp/x1-step-13-5.patch
+          test "$(sha256sum .step135/part2c0.b64 | cut -d' ' -f1)" = "6ef1696da8e213fd1a584b90f633f0176d64bd8994abfefb53899e9d39689b9a"
+          test "$(sha256sum .step135/part2c1.b64 | cut -d' ' -f1)" = "6a9f08a6b68918fe97bd5eb7b2a61a1871c5efa321b9a138592608b6f340a9ce"
+          test "$(sha256sum .step135/part2c2.b64 | cut -d' ' -f1)" = "2d42873a82e93ce4c689b70f105b9c335726dc78fa3c1050ddaa897318251e1d"
+          cat .step135/part0.b64 .step135/part1.b64 .step135/part2a.b64 .step135/part2b.b64 .step135/part2c0.b64 .step135/part2c1.b64 .step135/part2c2.b64 .step135/part3.b64 .step135/part4.b64 | base64 -d > /tmp/x1-step-13-5.patch
           test "$(sha256sum /tmp/x1-step-13-5.patch | cut -d' ' -f1)" = "585072cf0b71871a328abe7e3ad87fcd5aa7d20bf159b29257d1b99dae9dec39"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
