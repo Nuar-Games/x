@@ -57,6 +57,7 @@ Current rules version: **0.2.0** (see `GAME_RULES.md`, D-005 and D-009).
 - Normal VS choice is consumed by advancing immediately to `EFFECT_ACTIONS`, which also enforces the newly deployed/replacement position lock for the rest of that turn.
 - Commands return accepted (new state + events) or rejected (unchanged state + stable code).
 - Effect Zone / STA capacity is implemented: immutable card-definition snapshots in match state, effective-stat calculation in locked order, normal 5-slot cap, STA-derived Effect capacity, Effect placement pending later resolver work, voluntary Effect removal to opponent Zone X, slot-lock capacity, and deterministic forced excess removal to Zone Tepi.
+- Zone transitions are centralized in `packages/engine/src/zones.ts`. Normal gameplay movement now routes through the engine-owned primitive, source-container membership is verified, leaving Effect cleans source-bound state, and Zone X cannot be used as a source under any transition.
 - Known placeholder: an empty deck at turn-start draw throws until deck exhaustion and scoring are implemented (X1 step 14).
 - No AI implemented yet.
 - No X Supabase backend created yet.
@@ -141,11 +142,12 @@ Immediate sequence:
 7. ~~implement turn-state machine and hand-cap enforcement~~ — done;
 8. ~~implement VS deployment / position / replacement~~ — done;
 9. ~~implement Effect Zone and STA capacity~~ — done;
-10. continue through the X1 order defined in `ARCHITECTURE.md`;
-11. add tests as each subsystem is implemented.
+10. ~~implement zone-transition invariants including Zone X~~ — done;
+11. continue through the X1 order defined in `ARCHITECTURE.md`;
+12. add tests as each subsystem is implemented.
 
 Do not proceed to X2 until all X1 exit criteria in `PHASES_AND_WORKFLOW.md` pass.
 
 ## Next Concrete Task
 
-**Implement zone-transition invariants including Zone X (ARCHITECTURE.md §18 step 9).**
+**Implement the battle resolver (ARCHITECTURE.md §18 step 10).**

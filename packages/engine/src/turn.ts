@@ -19,8 +19,9 @@ import type {
   ReplaceVsCommand,
   TransitionResult
 } from "./commands.ts";
-import { effectCapacity, removeEffectSourceState } from "./effects.ts";
-import type { CardInstance, CardInstanceId, GameState, PlayerId, PlayerState, TurnStage } from "./state.ts";
+import { effectCapacity } from "./effects.ts";
+import type { GameState, PlayerId, PlayerState, TurnStage } from "./state.ts";
+import { moveCard } from "./zones.ts";
 
 export const OPENING_TURN_HAND_LIMIT = 6;
 export const HAND_LIMIT = 5;
@@ -53,16 +54,10 @@ function withPlayer(state: GameState, player: PlayerState): GameState {
   return { ...state, players: { ...state.players, [player.playerId]: player } };
 }
 
-function withInstances(state: GameState, updates: readonly CardInstance[]): GameState {
-  const cardInstances = { ...state.cardInstances };
-  for (const instance of updates) cardInstances[instance.instanceId] = instance;
-  return { ...state, cardInstances };
-}
-
 function runTurnStartDraw(state: GameState, events: EngineEvent[]): GameState {
   const playerId = state.activePlayerId;
   const started: PlayerState = { ...state.players[playerId], turnsStarted: state.players[playerId].turnsStarted + 1 };
-  state = { ...state, effectCardsPlayedThisTurn: 0 };
+  let next = withPlayer({ ...state, effectCardsPlayedThisTurn: 0 }, started);
   events.push({ type: "TURN_STARTED", playerId, turnNumber: state.turnNumber, isOpeningTurn: isOpeningTurn(started) });
 
   const drawnId = started.deck[0];
@@ -70,11 +65,13 @@ function runTurnStartDraw(state: GameState, events: EngineEvent[]): GameState {
     throw new Error("deck exhaustion at turn-start draw is not implemented yet (X1 step 14)");
   }
 
-  const drawn = state.cardInstances[drawnId];
-  if (!drawn) throw new Error(`missing card instance: ${drawnId}`);
-
-  let next = withPlayer(state, { ...started, deck: started.deck.slice(1), hand: [...started.hand, drawnId] });
-  next = withInstances(next, [{ ...drawn, zone: "HAND" }]);
+  next = moveCard(next, {
+    instanceId: drawnId,
+    fromPlayerId: playerId,
+    from: "DECK",
+    toPlayerId: playerId,
+    to: "HAND"
+  });
   events.push({ type: "CARD_DRAWN", playerId, instanceId: drawnId });
   return setStage(next, "HAND_LIMIT_ENFORCEMENT", events);
 }
@@ -142,15 +139,15 @@ function applyDiscardForHandLimit(state: GameState, command: DiscardForHandLimit
   if (!command.cardInstanceIds.every((id) => player.hand.includes(id))) return reject(state, "CARD_NOT_IN_HAND");
 
   const events: EngineEvent[] = [];
-  const discarded = new Set<CardInstanceId>(command.cardInstanceIds);
-  const nextPlayer: PlayerState = {
-    ...player,
-    hand: player.hand.filter((id) => !discarded.has(id)),
-    zoneTepi: [...player.zoneTepi, ...command.cardInstanceIds]
-  };
-  let next = withPlayer(state, nextPlayer);
-  next = withInstances(next, command.cardInstanceIds.map((id) => ({ ...state.cardInstances[id]!, zone: "ZONE_TEPI" as const })));
+  let next = state;
   for (const instanceId of command.cardInstanceIds) {
+    next = moveCard(next, {
+      instanceId,
+      fromPlayerId: command.playerId,
+      from: "HAND",
+      toPlayerId: command.playerId,
+      to: "ZONE_TEPI"
+    });
     events.push({ type: "CARD_MOVED", playerId: command.playerId, instanceId, from: "HAND", to: "ZONE_TEPI", reason: "HAND_LIMIT_DISCARD" });
   }
 
@@ -167,9 +164,14 @@ function applyDeployVs(state: GameState, command: DeployVsCommand): CommandResul
   const player = state.players[command.playerId];
   if (!player.hand.includes(command.cardInstanceId)) return reject(state, "CARD_NOT_IN_HAND");
   const events: EngineEvent[] = [];
-  const nextPlayer: PlayerState = { ...player, hand: player.hand.filter((id) => id !== command.cardInstanceId), vs: command.cardInstanceId, vsPosition: command.position };
-  let next = withPlayer(state, nextPlayer);
-  next = withInstances(next, [{ ...state.cardInstances[command.cardInstanceId]!, zone: "VS" }]);
+  let next = moveCard(state, {
+    instanceId: command.cardInstanceId,
+    fromPlayerId: command.playerId,
+    from: "HAND",
+    toPlayerId: command.playerId,
+    to: "VS",
+    toVsPosition: command.position
+  });
   events.push({ type: "VS_DEPLOYED", playerId: command.playerId, instanceId: command.cardInstanceId, position: command.position });
   next = moveToEffectActions(next, events);
   return { accepted: true, state: next, events };
@@ -203,15 +205,26 @@ function applyReplaceVs(state: GameState, command: ReplaceVsCommand): CommandRes
 
   const oldVs = player.vs;
   const opponentId = opponentOf(command.playerId);
-  const opponent = state.players[opponentId];
-  const nextPlayer: PlayerState = { ...player, hand: player.hand.filter((id) => id !== command.cardInstanceId), vs: command.cardInstanceId, vsPosition: command.position };
-  const nextOpponent: PlayerState = { ...opponent, zoneX: [...opponent.zoneX, oldVs] };
   const events: EngineEvent[] = [
     { type: "CARD_MOVED", playerId: command.playerId, instanceId: oldVs, from: "VS", to: "ZONE_X", reason: "VOLUNTARY_VS_REPLACEMENT" },
     { type: "VS_REPLACED", playerId: command.playerId, oldInstanceId: oldVs, newInstanceId: command.cardInstanceId, position: command.position }
   ];
-  let next: GameState = { ...state, players: { ...state.players, [command.playerId]: nextPlayer, [opponentId]: nextOpponent } };
-  next = withInstances(next, [{ ...state.cardInstances[oldVs]!, zone: "ZONE_X" }, { ...state.cardInstances[command.cardInstanceId]!, zone: "VS" }]);
+
+  let next = moveCard(state, {
+    instanceId: oldVs,
+    fromPlayerId: command.playerId,
+    from: "VS",
+    toPlayerId: opponentId,
+    to: "ZONE_X"
+  });
+  next = moveCard(next, {
+    instanceId: command.cardInstanceId,
+    fromPlayerId: command.playerId,
+    from: "HAND",
+    toPlayerId: command.playerId,
+    to: "VS",
+    toVsPosition: command.position
+  });
   next = moveToEffectActions(next, events);
   return { accepted: true, state: next, events };
 }
@@ -232,13 +245,17 @@ function applyPlayEffect(state: GameState, command: PlayEffectCommand): CommandR
     return reject(state, slotCount >= slotLimit ? "EFFECT_ZONE_FULL" : "INSUFFICIENT_STA");
   }
 
-  const nextPlayer: PlayerState = { ...player, hand: player.hand.filter((id) => id !== command.cardInstanceId), effectZone: [...player.effectZone, command.cardInstanceId] };
   const events: EngineEvent[] = [
     { type: "CARD_MOVED", playerId: command.playerId, instanceId: command.cardInstanceId, from: "HAND", to: "EFFECT", reason: "PLAY_EFFECT" },
     { type: "EFFECT_PLAYED", playerId: command.playerId, instanceId: command.cardInstanceId }
   ];
-  let next = withPlayer(state, nextPlayer);
-  next = withInstances(next, [{ ...instance, zone: "EFFECT" }]);
+  let next = moveCard(state, {
+    instanceId: command.cardInstanceId,
+    fromPlayerId: command.playerId,
+    from: "HAND",
+    toPlayerId: command.playerId,
+    to: "EFFECT"
+  });
   next = {
     ...next,
     effectCardsPlayedThisTurn: state.effectCardsPlayedThisTurn + 1,
@@ -255,16 +272,13 @@ function applyRemoveOwnEffect(state: GameState, command: RemoveOwnEffectCommand)
   if (!player.effectZone.includes(command.cardInstanceId)) return reject(state, "CARD_NOT_IN_EFFECT_ZONE");
 
   const opponentId = opponentOf(command.playerId);
-  const opponent = state.players[opponentId];
-  const instance = state.cardInstances[command.cardInstanceId]!;
-  const nextPlayer: PlayerState = { ...player, effectZone: player.effectZone.filter((id) => id !== command.cardInstanceId) };
-  const nextOpponent: PlayerState = { ...opponent, zoneX: [...opponent.zoneX, command.cardInstanceId] };
-  let next: GameState = {
-    ...state,
-    players: { ...state.players, [command.playerId]: nextPlayer, [opponentId]: nextOpponent },
-    cardInstances: { ...state.cardInstances, [command.cardInstanceId]: { ...instance, zone: "ZONE_X" } }
-  };
-  next = removeEffectSourceState(next, command.cardInstanceId);
+  const next = moveCard(state, {
+    instanceId: command.cardInstanceId,
+    fromPlayerId: command.playerId,
+    from: "EFFECT",
+    toPlayerId: opponentId,
+    to: "ZONE_X"
+  });
   const events: EngineEvent[] = [
     { type: "CARD_MOVED", playerId: command.playerId, instanceId: command.cardInstanceId, from: "EFFECT", to: "ZONE_X", reason: "VOLUNTARY_EFFECT_REMOVAL" },
     { type: "EFFECT_REMOVED", playerId: command.playerId, instanceId: command.cardInstanceId }
