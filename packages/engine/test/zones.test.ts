@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { moveCard, setupTestMatch, type GameState } from "../src/index.ts";
+import { moveCard, type GameState } from "../src/index.ts";
 import { testInput } from "./fixtures.ts";
+import { setupTestMatch } from "./helpers/setup-test-match.ts";
 
 function baseState(): GameState {
   return setupTestMatch(testInput(123));
