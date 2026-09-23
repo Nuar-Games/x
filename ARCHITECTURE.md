@@ -112,6 +112,7 @@ Initial command vocabulary:
 - `REPLACE_VS`
 - `REMOVE_OWN_EFFECT`
 - `PLAY_EFFECT`
+- `KEEP_VS`
 - `ATTACK`
 - `PASS`
 - `DISCARD_FOR_HAND_LIMIT` (GAME_RULES.md §3: the player chooses which cards to discard when over the hand limit after drawing)
@@ -244,6 +245,18 @@ Zone X uses a special invariant:
 **once a card enters Zone X, no effect or pending instruction may target, move, retrieve, destroy, alter, steal, or copy from that card.**
 
 This invariant is enforced in the engine, not left to individual card handlers.
+
+### Round end is engine-driven (D-014)
+
+Every card movement goes through `moveCard` or `moveCardsSimultaneously` in `zones.ts`. Whenever a VS leaves the VS Zone, for any reason, those functions end the round immediately (clear both Effect Zones to Zone Tepi, expire round-bound modifiers, advance the round number, emit `ROUND_ENDED`).
+
+Battle, VS replacement and card effects never call round end themselves, and round end is not exported. Simultaneous VS removals (ATK = ATK, BLACK HOLE) use `moveCardsSimultaneously`, so the round ends once.
+
+Every move emits a `CARD_MOVED` event with an engine-set reason.
+
+### Public API
+
+The engine's public entry point exports only: match setup, `advance`, `applyCommand`, read-only derived values (effective stats, capacity, hand limit) and types. Card movement, battle and RNG functions are internal. Tests import them from `src/` directly.
 
 ## 13. Battle Resolver
 

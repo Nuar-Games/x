@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createRng, nextInt, nextUint32, shuffle, type RngState } from "../src/index.ts";
+import { createRng, nextInt, nextUint32, shuffle, type RngState } from "../src/rng.ts";
 
 function sequence(seed: number, length: number): number[] {
   let rng: RngState = createRng(seed);

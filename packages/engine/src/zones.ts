@@ -1,11 +1,17 @@
-import type {
-  CardInstanceId,
-  GameState,
-  PlayerId,
-  PlayerState,
-  VsPosition,
-  Zone
-} from "./state.ts";
+/**
+ * Zone transitions (ARCHITECTURE.md §12) and engine-driven round end (GAME_RULES.md §12).
+ *
+ * Every card movement in the engine goes through `moveCard` or
+ * `moveCardsSimultaneously`. They:
+ * - enforce Zone X immutability and source-zone validity;
+ * - clean up state owned by an Effect card when it leaves the Effect Zone;
+ * - emit a CARD_MOVED event for every move;
+ * - END THE ROUND AUTOMATICALLY whenever a VS leaves the VS Zone, for any
+ *   reason (destruction, capture, voluntary replacement, return to deck,
+ *   any card effect). Callers never trigger round end themselves.
+ */
+import type { EngineEvent, MoveReason } from "./commands.ts";
+import type { CardInstanceId, GameState, PlayerId, PlayerState, VsPosition, Zone } from "./state.ts";
 
 export interface MoveCardInput {
   readonly instanceId: CardInstanceId;
@@ -14,6 +20,7 @@ export interface MoveCardInput {
   readonly toPlayerId: PlayerId;
   readonly to: Zone;
   readonly toVsPosition?: VsPosition;
+  readonly reason: MoveReason;
 }
 
 function zoneContains(player: PlayerState, zone: Zone, instanceId: CardInstanceId): boolean {
@@ -53,6 +60,7 @@ function addToZone(player: PlayerState, zone: Zone, instanceId: CardInstanceId, 
   }
 }
 
+/** The single place that removes state owned by an Effect card that left the Effect Zone. */
 function cleanEffectSourceState(state: GameState, sourceInstanceId: CardInstanceId): GameState {
   return {
     ...state,
@@ -60,17 +68,14 @@ function cleanEffectSourceState(state: GameState, sourceInstanceId: CardInstance
       (modifier) => !(modifier.sourceInstanceId === sourceInstanceId && modifier.duration === "WHILE_SOURCE_ACTIVE")
     ),
     ruleModifiers: state.ruleModifiers.filter(
-      (modifier) => !(modifier.sourceInstanceId === sourceInstanceId && modifier.expiry === "SOURCE_LEAVES_EFFECT_ZONE")
+      (modifier) => !(modifier.sourceInstanceId === sourceInstanceId && modifier.expiresOn.includes("SOURCE_LEAVES_EFFECT_ZONE"))
     ),
     activeContinuousEffectIds: state.activeContinuousEffectIds.filter((id) => id !== sourceInstanceId)
   };
 }
 
-/**
- * The only normal engine primitive for moving an existing card between zones.
- * Zone X is absolute: once a card is there, no later transition can move it out.
- */
-export function moveCard(state: GameState, input: MoveCardInput): GameState {
+/** One move, no round-end handling. Private: callers use moveCard / moveCardsSimultaneously. */
+function applyMove(state: GameState, input: MoveCardInput, events: EngineEvent[]): GameState {
   if (input.from === "ZONE_X") throw new Error("ZONE_X_IMMUTABLE");
 
   const instance = state.cardInstances[input.instanceId];
@@ -89,19 +94,60 @@ export function moveCard(state: GameState, input: MoveCardInput): GameState {
     ...state,
     players: samePlayer
       ? { ...state.players, [input.fromPlayerId]: addedToDestination }
-      : {
-          ...state.players,
-          [input.fromPlayerId]: removedFromSource,
-          [input.toPlayerId]: addedToDestination
-        },
-    cardInstances: {
-      ...state.cardInstances,
-      [input.instanceId]: { ...instance, zone: input.to }
-    }
+      : { ...state.players, [input.fromPlayerId]: removedFromSource, [input.toPlayerId]: addedToDestination },
+    cardInstances: { ...state.cardInstances, [input.instanceId]: { ...instance, zone: input.to } }
   };
 
-  if (input.from === "EFFECT" && input.to !== "EFFECT") {
-    next = cleanEffectSourceState(next, input.instanceId);
-  }
+  if (input.from === "EFFECT" && input.to !== "EFFECT") next = cleanEffectSourceState(next, input.instanceId);
+
+  events.push({
+    type: "CARD_MOVED",
+    instanceId: input.instanceId,
+    fromPlayerId: input.fromPlayerId,
+    from: input.from,
+    toPlayerId: input.toPlayerId,
+    to: input.to,
+    reason: input.reason
+  });
   return next;
+}
+
+/**
+ * GAME_RULES.md §12 round-end cleanup. Private: it runs only because a VS left
+ * the VS Zone inside moveCard / moveCardsSimultaneously.
+ */
+function endRound(state: GameState, events: EngineEvent[]): GameState {
+  let next = state;
+  for (const playerId of ["P1", "P2"] as const) {
+    for (const instanceId of [...next.players[playerId].effectZone]) {
+      next = applyMove(
+        next,
+        { instanceId, fromPlayerId: playerId, from: "EFFECT", toPlayerId: playerId, to: "ZONE_TEPI", reason: "ROUND_END_CLEAR" },
+        events
+      );
+    }
+  }
+  events.push({ type: "ROUND_ENDED", roundNumber: state.roundNumber });
+  return {
+    ...next,
+    roundNumber: state.roundNumber + 1,
+    statModifiers: next.statModifiers.filter((modifier) => modifier.duration !== "UNTIL_ROUND_END"),
+    ruleModifiers: next.ruleModifiers.filter((modifier) => !modifier.expiresOn.includes("ROUND_END"))
+  };
+}
+
+/** Moves one card. If it leaves the VS Zone, the round ends immediately afterwards. */
+export function moveCard(state: GameState, input: MoveCardInput, events: EngineEvent[]): GameState {
+  const next = applyMove(state, input, events);
+  return input.from === "VS" ? endRound(next, events) : next;
+}
+
+/**
+ * Moves several cards as one simultaneous event (for example, both VS destroyed
+ * in an ATK = ATK battle). The round ends at most once, after all moves.
+ */
+export function moveCardsSimultaneously(state: GameState, inputs: readonly MoveCardInput[], events: EngineEvent[]): GameState {
+  let next = state;
+  for (const input of inputs) next = applyMove(next, input, events);
+  return inputs.some((input) => input.from === "VS") ? endRound(next, events) : next;
 }

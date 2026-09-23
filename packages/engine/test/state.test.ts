@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { createRng, type GameState } from "../src/index.ts";
+import type { GameState } from "../src/index.ts";
+import { createRng } from "../src/rng.ts";
 
 function emptyPlayer(playerId: "P1" | "P2") {
   return {

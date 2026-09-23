@@ -2,7 +2,7 @@
 
 Status: **ESTABLISHMENT RULESET — LOCKED FOR X1**
 
-Rules version: **0.2.0**
+Rules version: **0.2.1**
 
 This document records only rules explicitly established by the creator. No implementation may invent, reinterpret, or imply unstated game behavior.
 
@@ -179,13 +179,13 @@ A newly deployed or replacement VS chooses ATK or DEF when deployed. Its positio
 
 If the active player loses their own VS during their turn and no effect explicitly gives them another action, the turn ends.
 
-A newly deployed VS may attack on the same turn if it is in ATK position and the opponent has a VS.
+A newly deployed VS may attack on the same turn it is deployed if it is in ATK position and the opponent has a VS.
 
 ### Voluntary VS replacement
 
 - Allowed only at the start of the player's own turn.
 - It is the alternative to changing the current VS position that turn; the player does not do both as separate start-of-turn actions.
-- The current surviving VS is captured by the opponent into Zone X.
+- The current surviving VS is captured by the opponent into Zone X. This ends the round (§12).
 - The player then deploys a new VS.
 
 ### Voluntary Effect removal
@@ -310,6 +310,20 @@ At round end:
 - a defeated player deploys a replacement VS according to the normal turn sequence.
 
 A successful ATK > DEF result that captures a top-deck card does not end the round because no VS was destroyed or removed.
+
+### Voluntary VS replacement ends the round
+
+Voluntary replacement (§6) captures the old VS into the opponent's Zone X, so it ends the round like any other VS leaving the VS Zone. It is not an exception. The sequence is:
+
+1. The active player chooses to replace their VS.
+2. The old VS is captured into the opponent's Zone X.
+3. The round ends immediately.
+4. Both Effect Zones are cleared to Zone Tepi and round-end modifiers expire.
+5. The active player deploys the chosen replacement VS in ATK or DEF.
+6. The replacement's position is locked for the rest of that turn.
+7. Play continues from the Effect step (§6 step 4).
+
+Because the Effect Zones are already empty, the replacement VS's STA never has to be checked against existing Effect cards.
 
 ## 13. Arena Collapse
 

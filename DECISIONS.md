@@ -231,3 +231,37 @@ Decision:
 3. **Deferred cards rejected at setup.** Any match, including test fixtures, rejects a card definition with `status: "DEFERRED"` (§18A).
 4. **Hand limit derived, not stored.** `PlayerState.handSizeLimit` is replaced by `turnsStarted`. The limit is 6 while `turnsStarted === 1` (opening turn) and 5 afterwards (§3).
 5. **`DISCARD_FOR_HAND_LIMIT` command added** to the command vocabulary, since §3 requires the player to choose discards.
+
+---
+
+## D-013 — Voluntary VS Replacement Ends the Round
+
+Status: **ACTIVE**
+
+Decision:
+
+Voluntary replacement captures the old VS into the opponent's Zone X, and §12 ends the round whenever a VS leaves the VS Zone by capture. Replacement is therefore not an exception: it ends the round. Sequence recorded in `GAME_RULES.md` §12 (rules 0.2.1).
+
+Consequence:
+
+Both Effect Zones are empty when the replacement VS is deployed, so its STA never has to be reconciled against existing Effect cards.
+
+---
+
+## D-014 — Step 11.5: Engine-Driven Round End and Command Wiring
+
+Status: **ACTIVE**
+
+Decision (from the step 9 audit):
+
+1. **Round end is engine-driven.** `moveCard` / `moveCardsSimultaneously` end the round whenever a VS leaves the VS Zone. No other code triggers round end, and it is not exported.
+2. **ATTACK and PASS commands** connect battle into play: Effect step → attack/pass → battle → Arena Collapse check (pass-through until step 12) → turn end.
+3. **One command pipeline.** `applyCommand` runs: common checks → handler → engine consequences (losing your own VS mid-turn ends the turn) → automatic transitions. Handlers live in `src/handlers/`.
+4. **PLAY_EFFECT no longer leaves a pending resolution** that blocked the rest of the turn. Effects occupy capacity until the resolver lands in step 13.
+5. **Stat floor per reduction.** The 0 floor applies after every modifier, matching §5.
+6. **Turn-bound modifiers expire at turn end.**
+7. **Rule modifiers take a list of expiry conditions** (`expiresOn`), so an attack restriction can end when consumed or when its source leaves.
+8. **Battle events are in the main event stream**, and every card move emits `CARD_MOVED` with a reason.
+9. **Duplicate logic removed** (Effect-source cleanup, slot-limit calculation).
+10. **Public API narrowed** to setup, advance, applyCommand, derived reads and types.
+11. **Lockfile restored.** CI installs with `--frozen-lockfile` and caches pnpm.

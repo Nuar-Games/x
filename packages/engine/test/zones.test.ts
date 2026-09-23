@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { moveCard, type GameState } from "../src/index.ts";
+import type { GameState } from "../src/index.ts";
+import { moveCard } from "../src/zones.ts";
 import { testInput } from "./fixtures.ts";
 import { setupTestMatch } from "./helpers/setup-test-match.ts";
 
@@ -16,8 +17,9 @@ describe("zone transitions", () => {
       fromPlayerId: "P1",
       from: "HAND",
       toPlayerId: "P1",
-      to: "ZONE_TEPI"
-    });
+      to: "ZONE_TEPI",
+      reason: "PLAY_EFFECT"
+    }, []);
 
     expect(result.players.P1.hand).not.toContain(id);
     expect(result.players.P1.zoneTepi).toContain(id);
@@ -32,8 +34,9 @@ describe("zone transitions", () => {
       fromPlayerId: "P1",
       from: "HAND",
       toPlayerId: "P2",
-      to: "ZONE_X"
-    });
+      to: "ZONE_X",
+      reason: "PLAY_EFFECT"
+    }, []);
 
     expect(() =>
       moveCard(inZoneX, {
@@ -41,8 +44,9 @@ describe("zone transitions", () => {
         fromPlayerId: "P2",
         from: "ZONE_X",
         toPlayerId: "P1",
-        to: "HAND"
-      })
+        to: "HAND",
+        reason: "PLAY_EFFECT"
+      }, [])
     ).toThrow("ZONE_X_IMMUTABLE");
   });
 
@@ -55,8 +59,9 @@ describe("zone transitions", () => {
         fromPlayerId: "P1",
         from: "EFFECT",
         toPlayerId: "P1",
-        to: "ZONE_TEPI"
-      })
+        to: "ZONE_TEPI",
+        reason: "PLAY_EFFECT"
+      }, [])
     ).toThrow("SOURCE_ZONE_MISMATCH");
   });
 
@@ -69,8 +74,9 @@ describe("zone transitions", () => {
       fromPlayerId: "P1",
       from: "HAND",
       toPlayerId: "P1",
-      to: "EFFECT"
-    });
+      to: "EFFECT",
+      reason: "PLAY_EFFECT"
+    }, []);
     const withModifiers: GameState = {
       ...inEffect,
       statModifiers: [
@@ -92,7 +98,7 @@ describe("zone transitions", () => {
           affectedPlayerId: "P2",
           kind: "ATTACK_RESTRICTION",
           value: 1,
-          expiry: "SOURCE_LEAVES_EFFECT_ZONE"
+          expiresOn: ["SOURCE_LEAVES_EFFECT_ZONE"]
         }
       ],
       activeContinuousEffectIds: [sourceId]
@@ -103,8 +109,9 @@ describe("zone transitions", () => {
       fromPlayerId: "P1",
       from: "EFFECT",
       toPlayerId: "P1",
-      to: "ZONE_TEPI"
-    });
+      to: "ZONE_TEPI",
+      reason: "PLAY_EFFECT"
+    }, []);
     expect(moved.statModifiers).toHaveLength(0);
     expect(moved.ruleModifiers).toHaveLength(0);
     expect(moved.activeContinuousEffectIds).toHaveLength(0);
