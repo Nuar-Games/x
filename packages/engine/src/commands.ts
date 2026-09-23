@@ -12,6 +12,7 @@ export type Command =
   | ChangeVsPositionCommand
   | ReplaceVsCommand
   | PlayEffectCommand
+  | ResolveEffectChoiceCommand
   | RemoveOwnEffectCommand
   | AttackCommand
   | PassCommand;
@@ -49,6 +50,13 @@ export interface PlayEffectCommand {
   readonly type: "PLAY_EFFECT";
   readonly playerId: PlayerId;
   readonly cardInstanceId: CardInstanceId;
+}
+
+/** Supplies the explicit card choices demanded by a pending Effect resolution. */
+export interface ResolveEffectChoiceCommand {
+  readonly type: "RESOLVE_EFFECT_CHOICE";
+  readonly playerId: PlayerId;
+  readonly cardInstanceIds: readonly CardInstanceId[];
 }
 
 export interface RemoveOwnEffectCommand {
@@ -90,7 +98,10 @@ export type MoveReason =
   | "BATTLE_TOP_DECK_CAPTURE"
   | "BATTLE_TOP_DECK_DISCARD"
   | "ROUND_END_CLEAR"
-  | "ARENA_COLLAPSE";
+  | "ARENA_COLLAPSE"
+  | "EFFECT_DRAW"
+  | "EFFECT_DISCARD"
+  | "EFFECT_DESTROYED";
 
 export type RejectionCode =
   | "MATCH_NOT_ACTIVE"
@@ -107,6 +118,9 @@ export type RejectionCode =
   | "INSUFFICIENT_STA"
   | "EFFECT_REMOVAL_WINDOW_CLOSED"
   | "RESOLUTION_PENDING"
+  | "NO_PENDING_RESOLUTION"
+  | "WRONG_EFFECT_CHOICE_COUNT"
+  | "INVALID_EFFECT_CHOICE"
   | "VS_NOT_IN_ATK_POSITION"
   | "NO_OPPONENT_VS";
 
@@ -133,6 +147,7 @@ export type EngineEvent =
   | { readonly type: "ROUND_ENDED"; readonly roundNumber: number }
   | { readonly type: "ARENA_COLLAPSED"; readonly triggeringPlayerId: PlayerId; readonly inactiveTurns: number }
   | { readonly type: "ATTACK_DECLARED"; readonly playerId: PlayerId }
+  | { readonly type: "ATTACK_PREVENTED"; readonly playerId: PlayerId; readonly sourceInstanceId: CardInstanceId }
   | { readonly type: "PASSED"; readonly playerId: PlayerId }
   | {
       readonly type: "BATTLE_RESOLVED";
@@ -166,6 +181,8 @@ export type EngineEvent =
       readonly position: VsPosition;
     }
   | { readonly type: "EFFECT_PLAYED"; readonly playerId: PlayerId; readonly instanceId: CardInstanceId }
+  | { readonly type: "EFFECT_CHOICE_REQUIRED"; readonly playerId: PlayerId; readonly sourceInstanceId: CardInstanceId; readonly count: number }
+  | { readonly type: "EFFECT_RESOLVED"; readonly playerId: PlayerId; readonly sourceInstanceId: CardInstanceId }
   | { readonly type: "EFFECT_REMOVED"; readonly playerId: PlayerId; readonly instanceId: CardInstanceId }
   | { readonly type: "STAGE_CHANGED"; readonly playerId: PlayerId; readonly from: TurnStage; readonly to: TurnStage }
   | { readonly type: "TURN_ENDED"; readonly playerId: PlayerId; readonly turnNumber: number };

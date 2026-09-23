@@ -9,6 +9,35 @@ export type Zone = "DECK" | "HAND" | "VS" | "EFFECT" | "ZONE_X" | "ZONE_TEPI";
 export type VsPosition = "ATK" | "DEF";
 export type MatchStatus = "ACTIVE" | "RESOLVED";
 export type Winner = PlayerId | "DRAW" | null;
+export type Stat = "ATK" | "DEF" | "STA";
+export type ModifierDuration = "WHILE_SOURCE_ACTIVE" | "UNTIL_ROUND_END" | "UNTIL_TURN_END";
+
+export type EffectSpec =
+  | { readonly family: "DRAW"; readonly count: number; readonly from: "OWN_DECK" }
+  | {
+      readonly family: "SET_STAT";
+      readonly target: "OWN_VS" | "OPPONENT_VS";
+      readonly stat: Stat;
+      readonly value: number;
+      readonly duration?: ModifierDuration;
+    }
+  | {
+      readonly family: "MODIFY_STAT";
+      readonly target: "OWN_VS" | "OPPONENT_VS";
+      readonly stat: Stat;
+      readonly delta: number;
+      readonly duration?: ModifierDuration;
+    }
+  | { readonly family: "DESTROY_ALL"; readonly target: "OPPONENT_EFFECT_ZONE" }
+  | { readonly family: "SET_POSITION"; readonly target: "OPPONENT_VS"; readonly position: VsPosition }
+  | { readonly family: "BLOCK_ATTACKS"; readonly target: "OPPONENT"; readonly count: number }
+  | {
+      readonly family: "DISCARD_CHOSEN";
+      readonly count: number;
+      readonly from: "OWN_HAND";
+      readonly to: "OWN_ZONE_TEPI";
+    }
+  | { readonly family: "SEQUENCE"; readonly steps: readonly EffectSpec[]; readonly duration?: ModifierDuration };
 
 export type TurnStage =
   | "TURN_START_DRAW"
@@ -42,6 +71,7 @@ export interface CardDefinitionSnapshot {
   readonly def: number;
   readonly sta: number;
   readonly hasPlayableEffect: boolean;
+  readonly effect?: EffectSpec;
   readonly status?: "DEFERRED";
 }
 
@@ -52,9 +82,6 @@ export interface CardInstance {
   readonly controllerId: PlayerId;
   readonly zone: Zone;
 }
-
-export type Stat = "ATK" | "DEF" | "STA";
-export type ModifierDuration = "WHILE_SOURCE_ACTIVE" | "UNTIL_ROUND_END" | "UNTIL_TURN_END";
 
 interface StatModifierBase {
   readonly id: string;
@@ -92,11 +119,17 @@ export interface RuleModifierState {
   readonly expiresOn: readonly RuleModifierExpiry[];
 }
 
+export type PendingEffectChoiceKind = "DISCARD_OWN_HAND" | "REMOVE_EXCESS_EFFECTS";
+
 export interface PendingResolutionState {
-  readonly kind: string;
+  readonly kind: "EFFECT_CHOICE";
   readonly sourceInstanceId: CardInstanceId;
   readonly actingPlayerId: PlayerId;
-  readonly remainingChoiceIds: readonly string[];
+  readonly choiceKind: PendingEffectChoiceKind;
+  readonly choiceCount: number;
+  readonly affectedPlayerId: PlayerId;
+  readonly remainingSteps: readonly EffectSpec[];
+  readonly inheritedDuration?: ModifierDuration;
 }
 
 export interface GameState {

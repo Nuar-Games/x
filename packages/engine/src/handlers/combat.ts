@@ -2,7 +2,20 @@
 import { resolveBattle } from "../battle.ts";
 import type { AttackCommand, EngineEvent, PassCommand } from "../commands.ts";
 import { accept, opponentOf, reject, setStage, type HandlerResult } from "../internal/turn-helpers.ts";
-import type { GameState } from "../state.ts";
+import type { GameState, RuleModifierState } from "../state.ts";
+
+function consumeAttackRestriction(state: GameState, playerId: "P1" | "P2", events: EngineEvent[]): GameState | null {
+  const restriction = state.ruleModifiers.find(
+    (modifier) => modifier.kind === "ATTACK_RESTRICTION" && modifier.affectedPlayerId === playerId
+  );
+  if (!restriction) return null;
+
+  events.push({ type: "ATTACK_PREVENTED", playerId, sourceInstanceId: restriction.sourceInstanceId });
+  const ruleModifiers: RuleModifierState[] = restriction.value <= 1
+    ? state.ruleModifiers.filter((modifier) => modifier.id !== restriction.id)
+    : state.ruleModifiers.map((modifier) => modifier.id === restriction.id ? { ...modifier, value: modifier.value - 1 } : modifier);
+  return { ...state, ruleModifiers };
+}
 
 export function attack(state: GameState, command: AttackCommand): HandlerResult {
   if (state.turnStage !== "EFFECT_ACTIONS") return reject("WRONG_STAGE");
@@ -13,6 +26,12 @@ export function attack(state: GameState, command: AttackCommand): HandlerResult 
   if (state.players[opponentOf(command.playerId)].vs === null) return reject("NO_OPPONENT_VS");
 
   const events: EngineEvent[] = [{ type: "ATTACK_DECLARED", playerId: command.playerId }];
+  const prevented = consumeAttackRestriction(state, command.playerId, events);
+  if (prevented !== null) {
+    const next = setStage(prevented, "ARENA_COLLAPSE_CHECK", events);
+    return accept(next, events);
+  }
+
   let next: GameState = { ...state, attacksThisTurn: state.attacksThisTurn + 1 };
   next = setStage(next, "COMBAT_OR_PASS", events);
   next = resolveBattle(next, command.playerId, events);

@@ -9,7 +9,7 @@
 import type { Command, CommandResult, EngineEvent, TransitionResult } from "./commands.ts";
 import { changeVsPosition, deployVs, keepVs, replaceVs } from "./handlers/vs.ts";
 import { attack, pass } from "./handlers/combat.ts";
-import { playEffect, removeOwnEffect } from "./handlers/effects.ts";
+import { playEffect, removeOwnEffect, resolveEffectChoice } from "./handlers/effects.ts";
 import { discardForHandLimit } from "./handlers/hand.ts";
 import { handLimitFor, isOpeningTurn } from "./hand-limit.ts";
 import { opponentOf, setStage, type HandlerResult } from "./internal/turn-helpers.ts";
@@ -156,6 +156,7 @@ function runHandler(state: GameState, command: Command): HandlerResult {
     case "CHANGE_VS_POSITION": return changeVsPosition(state, command);
     case "REPLACE_VS": return replaceVs(state, command);
     case "PLAY_EFFECT": return playEffect(state, command);
+    case "RESOLVE_EFFECT_CHOICE": return resolveEffectChoice(state, command);
     case "REMOVE_OWN_EFFECT": return removeOwnEffect(state, command);
     case "ATTACK": return attack(state, command);
     case "PASS": return pass(state, command);
