@@ -1,12 +1,12 @@
 import type {
   CardDefinitionSnapshot,
-  CardInstance,
   CardInstanceId,
   GameState,
   PlayerId,
   Stat,
   StatModifier
 } from "./state.ts";
+import { moveCard } from "./zones.ts";
 
 export const NORMAL_EFFECT_ZONE_LIMIT = 5;
 
@@ -80,19 +80,6 @@ export function requiredExcessEffectCount(state: GameState, playerId: PlayerId):
   return Math.max(0, state.players[playerId].effectZone.length - effectCapacity(state, playerId));
 }
 
-function stripSourceBoundState(state: GameState, leavingIds: ReadonlySet<CardInstanceId>): GameState {
-  return {
-    ...state,
-    statModifiers: state.statModifiers.filter(
-      (modifier) => !(leavingIds.has(modifier.sourceInstanceId) && modifier.duration === "WHILE_SOURCE_ACTIVE")
-    ),
-    ruleModifiers: state.ruleModifiers.filter(
-      (modifier) => !(leavingIds.has(modifier.sourceInstanceId) && modifier.expiry === "SOURCE_LEAVES_EFFECT_ZONE")
-    ),
-    activeContinuousEffectIds: state.activeContinuousEffectIds.filter((id) => !leavingIds.has(id))
-  };
-}
-
 /**
  * Applies the established forced-excess rule after effective STA changes.
  * The effect resolver supplies the exact cards chosen by the player entitled to choose.
@@ -105,28 +92,33 @@ export function removeExcessEffects(
   const required = requiredExcessEffectCount(state, affectedPlayerId);
   if (chosenIds.length !== required) throw new Error(`expected ${required} excess Effect card(s)`);
   if (new Set(chosenIds).size !== chosenIds.length) throw new Error("duplicate excess Effect choice");
-  const player = state.players[affectedPlayerId];
-  if (!chosenIds.every((id) => player.effectZone.includes(id))) throw new Error("excess Effect choice is not in Effect Zone");
+  if (!chosenIds.every((id) => state.players[affectedPlayerId].effectZone.includes(id))) {
+    throw new Error("excess Effect choice is not in Effect Zone");
+  }
 
-  const leaving = new Set(chosenIds);
-  const cardInstances: Record<CardInstanceId, CardInstance> = { ...state.cardInstances };
-  for (const id of chosenIds) cardInstances[id] = { ...cardInstances[id]!, zone: "ZONE_TEPI" };
-
-  const next: GameState = {
-    ...state,
-    players: {
-      ...state.players,
-      [affectedPlayerId]: {
-        ...player,
-        effectZone: player.effectZone.filter((id) => !leaving.has(id)),
-        zoneTepi: [...player.zoneTepi, ...chosenIds]
-      }
-    },
-    cardInstances
-  };
-  return stripSourceBoundState(next, leaving);
+  let next = state;
+  for (const id of chosenIds) {
+    next = moveCard(next, {
+      instanceId: id,
+      fromPlayerId: affectedPlayerId,
+      from: "EFFECT",
+      toPlayerId: affectedPlayerId,
+      to: "ZONE_TEPI"
+    });
+  }
+  return next;
 }
 
+/** Backward-compatible helper for tests/resolvers that only need source-bound cleanup. */
 export function removeEffectSourceState(state: GameState, sourceInstanceId: CardInstanceId): GameState {
-  return stripSourceBoundState(state, new Set([sourceInstanceId]));
+  return {
+    ...state,
+    statModifiers: state.statModifiers.filter(
+      (modifier) => !(modifier.sourceInstanceId === sourceInstanceId && modifier.duration === "WHILE_SOURCE_ACTIVE")
+    ),
+    ruleModifiers: state.ruleModifiers.filter(
+      (modifier) => !(modifier.sourceInstanceId === sourceInstanceId && modifier.expiry === "SOURCE_LEAVES_EFFECT_ZONE")
+    ),
+    activeContinuousEffectIds: state.activeContinuousEffectIds.filter((id) => id !== sourceInstanceId)
+  };
 }
