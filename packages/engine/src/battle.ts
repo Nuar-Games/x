@@ -4,8 +4,9 @@
  */
 import type { EngineEvent } from "./commands.ts";
 import { effectiveStat } from "./effects.ts";
+import { scoreIfDeckExhausted } from "./scoring.ts";
 import type { CardInstanceId, GameState, PlayerId, VsPosition } from "./state.ts";
-import { moveCard, moveCardsSimultaneously } from "./zones.ts";
+import { moveCard, moveCardsSimultaneously, type MoveCardInput } from "./zones.ts";
 
 export type BattleOutcome =
   | "ATTACKER_WINS_ATK_VS_ATK"
@@ -23,13 +24,6 @@ function requireVs(state: GameState, playerId: PlayerId): { id: CardInstanceId; 
   const player = state.players[playerId];
   if (player.vs === null || player.vsPosition === null) throw new Error("NO_VS");
   return { id: player.vs, position: player.vsPosition };
-}
-
-function topDeckCard(state: GameState, playerId: PlayerId): CardInstanceId {
-  const id = state.players[playerId].deck[0];
-  // GAME_RULES.md §19: should end and score the match. Implemented in X1 step 14.
-  if (id === undefined) throw new Error("TOP_DECK_REQUIRED_BUT_EMPTY");
-  return id;
 }
 
 /** Resolves one attack. Callers validate legality first (see ATTACK in turn.ts). */
@@ -70,33 +64,42 @@ export function resolveBattle(state: GameState, attackerId: PlayerId, events: En
 
   if (attackerAtk > defenderValue) {
     report("ATTACKER_PIERCES_DEF");
-    const captured = topDeckCard(state, defenderId);
-    return moveCard(
-      state,
-      { instanceId: captured, fromPlayerId: defenderId, from: "DECK", toPlayerId: attackerId, to: "ZONE_X", reason: "BATTLE_TOP_DECK_CAPTURE" },
-      events
-    );
+    const captured = state.players[defenderId].deck[0];
+    let next = state;
+    if (captured !== undefined) {
+      next = moveCard(
+        next,
+        { instanceId: captured, fromPlayerId: defenderId, from: "DECK", toPlayerId: attackerId, to: "ZONE_X", reason: "BATTLE_TOP_DECK_CAPTURE" },
+        events
+      );
+    }
+    return scoreIfDeckExhausted(next, events);
   }
 
   if (attackerAtk === defenderValue) {
     report("ATK_EQUALS_DEF");
-    const attackerTop = topDeckCard(state, attackerId);
-    const defenderTop = topDeckCard(state, defenderId);
-    return moveCardsSimultaneously(
-      state,
-      [
-        { instanceId: attackerTop, fromPlayerId: attackerId, from: "DECK", toPlayerId: attackerId, to: "ZONE_TEPI", reason: "BATTLE_TOP_DECK_DISCARD" },
-        { instanceId: defenderTop, fromPlayerId: defenderId, from: "DECK", toPlayerId: defenderId, to: "ZONE_TEPI", reason: "BATTLE_TOP_DECK_DISCARD" }
-      ],
-      events
-    );
+    const moves: MoveCardInput[] = [];
+    const attackerTop = state.players[attackerId].deck[0];
+    const defenderTop = state.players[defenderId].deck[0];
+    if (attackerTop !== undefined) {
+      moves.push({ instanceId: attackerTop, fromPlayerId: attackerId, from: "DECK", toPlayerId: attackerId, to: "ZONE_TEPI", reason: "BATTLE_TOP_DECK_DISCARD" });
+    }
+    if (defenderTop !== undefined) {
+      moves.push({ instanceId: defenderTop, fromPlayerId: defenderId, from: "DECK", toPlayerId: defenderId, to: "ZONE_TEPI", reason: "BATTLE_TOP_DECK_DISCARD" });
+    }
+    const next = moves.length > 0 ? moveCardsSimultaneously(state, moves, events) : state;
+    return scoreIfDeckExhausted(next, events);
   }
 
   report("ATTACKER_BLOCKED_BY_DEF");
-  const discarded = topDeckCard(state, attackerId);
-  return moveCard(
-    state,
-    { instanceId: discarded, fromPlayerId: attackerId, from: "DECK", toPlayerId: attackerId, to: "ZONE_TEPI", reason: "BATTLE_TOP_DECK_DISCARD" },
-    events
-  );
+  const discarded = state.players[attackerId].deck[0];
+  let next = state;
+  if (discarded !== undefined) {
+    next = moveCard(
+      next,
+      { instanceId: discarded, fromPlayerId: attackerId, from: "DECK", toPlayerId: attackerId, to: "ZONE_TEPI", reason: "BATTLE_TOP_DECK_DISCARD" },
+      events
+    );
+  }
+  return scoreIfDeckExhausted(next, events);
 }
