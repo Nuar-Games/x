@@ -7,20 +7,20 @@
  * The 30–50 deck-size rule is NOT here. It lives only in `setupMatch`
  * (setup.ts), so there is no switch, flag or parameter anywhere in
  * production code that disables it (D-010).
- *
- * Only setup.ts and engine tests may import this file (enforced by
- * .dependency-cruiser.cjs rule "setup-core-is-private").
  */
 import { RULES_VERSION } from "../version.ts";
 import { createRng, shuffle, type RngState } from "../rng.ts";
-import type { CardInstance, CardInstanceId, GameState, MatchId, PlayerId, PlayerState } from "../state.ts";
+import type {
+  CardDefinitionSnapshot,
+  CardInstance,
+  CardInstanceId,
+  GameState,
+  MatchId,
+  PlayerId,
+  PlayerState
+} from "../state.ts";
 
-export interface SetupCardDefinition {
-  readonly id: string;
-  readonly name: string;
-  /** "DEFERRED" cards are not implemented and can never enter a match (GAME_RULES.md §18A). */
-  readonly status?: "DEFERRED";
-}
+export interface SetupCardDefinition extends CardDefinitionSnapshot {}
 
 export interface MatchSetupInput {
   readonly matchId: MatchId;
@@ -38,6 +38,9 @@ function definitionMap(definitions: readonly SetupCardDefinition[]): Map<string,
   const map = new Map<string, SetupCardDefinition>();
   for (const definition of definitions) {
     if (map.has(definition.id)) throw new Error(`duplicate card definition id: ${definition.id}`);
+    if (!Number.isInteger(definition.atk) || definition.atk < 0) throw new Error(`invalid ATK for ${definition.name}`);
+    if (!Number.isInteger(definition.def) || definition.def < 0) throw new Error(`invalid DEF for ${definition.name}`);
+    if (!Number.isInteger(definition.sta) || definition.sta < 1) throw new Error(`invalid STA for ${definition.name}`);
     map.set(definition.id, definition);
   }
   return map;
@@ -126,10 +129,12 @@ export function buildInitialState(input: MatchSetupInput): GameState {
       P1: dealOpeningHand("P1", p1Shuffle.value, cardInstances),
       P2: dealOpeningHand("P2", p2Shuffle.value, cardInstances)
     },
+    cardDefinitions: Object.fromEntries(input.cardDefinitions.map((definition) => [definition.id, definition])),
     cardInstances,
     statModifiers: [],
     activeContinuousEffectIds: [],
     ruleModifiers: [],
-    pendingResolution: null
+    pendingResolution: null,
+    effectCardsPlayedThisTurn: 0
   };
 }

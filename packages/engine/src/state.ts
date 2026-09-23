@@ -34,6 +34,17 @@ export interface PlayerState {
   readonly turnsStarted: number;
 }
 
+/** Immutable card-set data snapshotted into the match so rules stay renderer/backend independent. */
+export interface CardDefinitionSnapshot {
+  readonly id: CardDefinitionId;
+  readonly name: string;
+  readonly atk: number;
+  readonly def: number;
+  readonly sta: number;
+  readonly hasPlayableEffect: boolean;
+  readonly status?: "DEFERRED";
+}
+
 export interface CardInstance {
   readonly instanceId: CardInstanceId;
   readonly definitionId: CardDefinitionId;
@@ -100,9 +111,12 @@ export interface GameState {
   readonly status: MatchStatus;
   readonly winner: Winner;
   readonly players: Readonly<Record<PlayerId, PlayerState>>;
+  readonly cardDefinitions: Readonly<Record<CardDefinitionId, CardDefinitionSnapshot>>;
   readonly cardInstances: Readonly<Record<CardInstanceId, CardInstance>>;
   readonly statModifiers: readonly StatModifier[];
   readonly activeContinuousEffectIds: readonly CardInstanceId[];
   readonly ruleModifiers: readonly RuleModifierState[];
   readonly pendingResolution: PendingResolutionState | null;
+  /** Number of Effect cards played by the active player this turn. Reset at turn start. */
+  readonly effectCardsPlayedThisTurn: number;
 }

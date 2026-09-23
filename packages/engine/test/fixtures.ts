@@ -2,7 +2,11 @@ import type { MatchSetupInput, SetupCardDefinition } from "../src/index.ts";
 
 export const definitions: readonly SetupCardDefinition[] = Array.from({ length: 20 }, (_, index) => ({
   id: `X${String(index + 1).padStart(3, "0")}`,
-  name: `Card ${index + 1}`
+  name: `Card ${index + 1}`,
+  atk: 500 + index,
+  def: 400 + index,
+  sta: (index % 5) + 1,
+  hasPlayableEffect: true
 }));
 
 /** 30 cards: two copies of the first 15 definitions. */

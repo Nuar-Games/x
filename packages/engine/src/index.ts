@@ -15,5 +15,6 @@ export { RULES_VERSION } from "./version.ts";
 export * from "./rng.ts";
 export * from "./state.ts";
 export * from "./commands.ts";
+export * from "./effects.ts";
 export * from "./setup.ts";
 export { advance, applyCommand, handLimitFor, isOpeningTurn, opponentOf, HAND_LIMIT, OPENING_TURN_HAND_LIMIT } from "./turn.ts";
