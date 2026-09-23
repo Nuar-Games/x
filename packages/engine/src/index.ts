@@ -17,5 +17,6 @@ export * from "./state.ts";
 export * from "./commands.ts";
 export * from "./effects.ts";
 export * from "./zones.ts";
+export * from "./battle.ts";
 export * from "./setup.ts";
 export { advance, applyCommand, handLimitFor, isOpeningTurn, opponentOf, HAND_LIMIT, OPENING_TURN_HAND_LIMIT } from "./turn.ts";
