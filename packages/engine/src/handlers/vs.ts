@@ -5,7 +5,8 @@ import type { GameState } from "../state.ts";
 import { moveCard } from "../zones.ts";
 
 export function deployVs(state: GameState, command: DeployVsCommand): HandlerResult {
-  if (state.turnStage !== "REQUIRED_VS_DEPLOYMENT") return reject("WRONG_STAGE");
+  const postCollapse = state.turnStage === "POST_COLLAPSE_DEPLOYMENT";
+  if (state.turnStage !== "REQUIRED_VS_DEPLOYMENT" && !postCollapse) return reject("WRONG_STAGE");
   if (!state.players[command.playerId].hand.includes(command.cardInstanceId)) return reject("CARD_NOT_IN_HAND");
 
   const events: EngineEvent[] = [];
@@ -23,7 +24,7 @@ export function deployVs(state: GameState, command: DeployVsCommand): HandlerRes
     events
   );
   events.push({ type: "VS_DEPLOYED", playerId: command.playerId, instanceId: command.cardInstanceId, position: command.position });
-  next = setStage(next, "EFFECT_ACTIONS", events);
+  next = setStage(next, postCollapse ? "TURN_END" : "EFFECT_ACTIONS", events);
   return accept(next, events);
 }
 
