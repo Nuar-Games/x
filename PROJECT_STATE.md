@@ -56,8 +56,8 @@ Current rules version: **0.2.0** (see `GAME_RULES.md`, D-005 and D-009).
 - VS step is implemented: required deployment from hand in ATK/DEF, explicit keep-as-is, one start-of-turn ATK/DEF position change, and voluntary replacement. Voluntary replacement captures the old VS into the opponent's Zone X before the new VS is deployed.
 - Normal VS choice is consumed by advancing immediately to `EFFECT_ACTIONS`, which also enforces the newly deployed/replacement position lock for the rest of that turn.
 - Commands return accepted (new state + events) or rejected (unchanged state + stable code).
+- Effect Zone / STA capacity is implemented: immutable card-definition snapshots in match state, effective-stat calculation in locked order, normal 5-slot cap, STA-derived Effect capacity, Effect placement pending later resolver work, voluntary Effect removal to opponent Zone X, slot-lock capacity, and deterministic forced excess removal to Zone Tepi.
 - Known placeholder: an empty deck at turn-start draw throws until deck exhaustion and scoring are implemented (X1 step 14).
-- No UI implemented yet.
 - No AI implemented yet.
 - No X Supabase backend created yet.
 - No X Vercel project created yet.
@@ -140,11 +140,12 @@ Immediate sequence:
 6. ~~implement match setup and opening draw~~ — done;
 7. ~~implement turn-state machine and hand-cap enforcement~~ — done;
 8. ~~implement VS deployment / position / replacement~~ — done;
-9. continue through the X1 order defined in `ARCHITECTURE.md`;
-9. add tests as each subsystem is implemented.
+9. ~~implement Effect Zone and STA capacity~~ — done;
+10. continue through the X1 order defined in `ARCHITECTURE.md`;
+11. add tests as each subsystem is implemented.
 
 Do not proceed to X2 until all X1 exit criteria in `PHASES_AND_WORKFLOW.md` pass.
 
 ## Next Concrete Task
 
-**Implement Effect Zone and STA capacity (ARCHITECTURE.md §18 step 8): Effect occupancy, STA-derived capacity, normal 5-slot limit, voluntary Effect removal, and forced excess removal when effective STA falls below occupancy.**
+**Implement zone-transition invariants including Zone X (ARCHITECTURE.md §18 step 9).**

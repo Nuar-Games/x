@@ -12,7 +12,7 @@ describe("production match setup", () => {
   });
 
   it("rejects a deck above 50 cards", () => {
-    const many = Array.from({ length: 26 }, (_, i) => ({ id: `Y${String(i + 1).padStart(3, "0")}`, name: `Big ${i + 1}` }));
+    const many = Array.from({ length: 26 }, (_, i) => ({ id: `Y${String(i + 1).padStart(3, "0")}`, name: `Big ${i + 1}`, atk: 100, def: 100, sta: 2, hasPlayableEffect: true }));
     const big = many.flatMap((c) => [c.id, c.id]).slice(0, 51);
     expect(big).toHaveLength(51);
     expect(() => setupMatch(production({ cardDefinitions: [...definitions, ...many], player2Deck: big }))).toThrow(/30 to 50/);
@@ -25,7 +25,7 @@ describe("production match setup", () => {
   });
 
   it("counts copies by name, not by id", () => {
-    const sameName = [...definitions, { id: "X099", name: "Card 1" }];
+    const sameName = [...definitions, { ...definitions[1]!, id: "X099", name: "Card 1" }];
     const deck = legalDeck();
     deck[29] = "X099";
     expect(() => setupMatch(production({ cardDefinitions: sameName, player1Deck: deck }))).toThrow(/2 copies/i);

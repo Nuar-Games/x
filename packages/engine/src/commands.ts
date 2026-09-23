@@ -10,7 +10,9 @@ export type Command =
   | DeployVsCommand
   | KeepVsCommand
   | ChangeVsPositionCommand
-  | ReplaceVsCommand;
+  | ReplaceVsCommand
+  | PlayEffectCommand
+  | RemoveOwnEffectCommand;
 
 /** GAME_RULES.md §3: over the hand limit after drawing, discard down before other actions. */
 export interface DiscardForHandLimitCommand {
@@ -41,6 +43,18 @@ export interface ChangeVsPositionCommand {
   readonly position: VsPosition;
 }
 
+export interface PlayEffectCommand {
+  readonly type: "PLAY_EFFECT";
+  readonly playerId: PlayerId;
+  readonly cardInstanceId: CardInstanceId;
+}
+
+export interface RemoveOwnEffectCommand {
+  readonly type: "REMOVE_OWN_EFFECT";
+  readonly playerId: PlayerId;
+  readonly cardInstanceId: CardInstanceId;
+}
+
 /** GAME_RULES.md §6: voluntarily capture the current VS, then deploy a replacement. */
 export interface ReplaceVsCommand {
   readonly type: "REPLACE_VS";
@@ -57,7 +71,13 @@ export type RejectionCode =
   | "DUPLICATE_CARD"
   | "CARD_NOT_IN_HAND"
   | "NO_VS"
-  | "POSITION_UNCHANGED";
+  | "POSITION_UNCHANGED"
+  | "CARD_NOT_IN_EFFECT_ZONE"
+  | "CARD_HAS_NO_EFFECT"
+  | "EFFECT_ZONE_FULL"
+  | "INSUFFICIENT_STA"
+  | "EFFECT_REMOVAL_WINDOW_CLOSED"
+  | "RESOLUTION_PENDING";
 
 /** Structured transition events (ARCHITECTURE.md §8). The UI animates these; it never decides outcomes. */
 export type EngineEvent =
@@ -76,7 +96,7 @@ export type EngineEvent =
       readonly instanceId: CardInstanceId;
       readonly from: Zone;
       readonly to: Zone;
-      readonly reason: "HAND_LIMIT_DISCARD" | "VOLUNTARY_VS_REPLACEMENT";
+      readonly reason: "HAND_LIMIT_DISCARD" | "VOLUNTARY_VS_REPLACEMENT" | "PLAY_EFFECT" | "VOLUNTARY_EFFECT_REMOVAL" | "STA_EXCESS_REMOVAL";
     }
   | { readonly type: "VS_DEPLOYED"; readonly playerId: PlayerId; readonly instanceId: CardInstanceId; readonly position: VsPosition }
   | { readonly type: "VS_KEPT"; readonly playerId: PlayerId; readonly instanceId: CardInstanceId }
@@ -94,6 +114,8 @@ export type EngineEvent =
       readonly newInstanceId: CardInstanceId;
       readonly position: VsPosition;
     }
+  | { readonly type: "EFFECT_PLAYED"; readonly playerId: PlayerId; readonly instanceId: CardInstanceId }
+  | { readonly type: "EFFECT_REMOVED"; readonly playerId: PlayerId; readonly instanceId: CardInstanceId }
   | { readonly type: "STAGE_CHANGED"; readonly playerId: PlayerId; readonly from: TurnStage; readonly to: TurnStage }
   | { readonly type: "TURN_ENDED"; readonly playerId: PlayerId; readonly turnNumber: number };
 
