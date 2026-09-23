@@ -56,14 +56,13 @@ Current rules version: **0.2.1** (see `GAME_RULES.md`, D-013 and D-014).
 - VS step is implemented: required deployment from hand in ATK/DEF, explicit keep-as-is, one start-of-turn ATK/DEF position change, and voluntary replacement. Voluntary replacement captures the old VS into the opponent's Zone X before the new VS is deployed.
 - Normal VS choice is consumed by advancing immediately to `EFFECT_ACTIONS`, which also enforces the newly deployed/replacement position lock for the rest of that turn.
 - Commands return accepted (new state + events) or rejected (unchanged state + stable code).
-- Effect Zone / STA capacity is implemented: immutable card-definition snapshots in match state, effective-stat calculation in locked order, normal 5-slot cap, STA-derived Effect capacity, Effect placement pending later resolver work, voluntary Effect removal to opponent Zone X, slot-lock capacity, and deterministic forced excess removal to Zone Tepi.
+- Effect Zone / STA capacity is implemented: immutable card-definition snapshots in match state, effective-stat calculation in locked order, normal 5-slot cap, STA-derived Effect capacity, voluntary Effect removal to opponent Zone X, slot-lock capacity, and deterministic forced excess removal to Zone Tepi.
 - Zone transitions are centralized in `packages/engine/src/zones.ts`. Normal gameplay movement routes through the engine-owned primitive, source-container membership is verified, leaving Effect cleans source-bound state, and Zone X cannot be used as a source under any transition.
 - Battle matrix resolution is implemented in `packages/engine/src/battle.ts` and reached through the ATTACK command.
 - Round end is engine-driven (D-014): any VS leaving the VS Zone ends the round inside `zones.ts`. Voluntary replacement ends the round (D-013).
 - Arena Collapse is implemented: attack/Effect activity resets the inactivity sequence, inactive individual turns increment it, and the third consecutive inactive turn moves both VS and all Effects to Zone Tepi with no capture, resets the counter, ends the round once, requires the triggering player to deploy a new VS, then ends the turn.
-- Known placeholders:
-  - an empty deck at the turn-start draw, or when a battle needs a top-deck card, throws until deck exhaustion and scoring are implemented (X1 step 14);
-  - playing an Effect places it but does not apply its effect until the resolver (X1 step 13).
+- Effect resolver primitives are implemented for the locked 10-card proof vocabulary: DRAW, SET_STAT, MODIFY_STAT, DESTROY_ALL opponent Effects, SET_POSITION, BLOCK_ATTACKS, SEQUENCE and DISCARD_CHOSEN. Resolution is command-driven, explicit choices are serialized through `pendingResolution` / `RESOLVE_EFFECT_CHOICE`, STA=0 destruction and STA-excess consequences happen immediately, and attack restrictions are consumed by the next legal attack attempt.
+- Known placeholder: an empty deck at the turn-start draw, during Effect draw, or when a battle needs a top-deck card throws until deck exhaustion and scoring are implemented (X1 step 14).
 - No AI implemented yet.
 - No X Supabase backend created yet.
 - No X Vercel project created yet.
@@ -151,11 +150,12 @@ Immediate sequence:
 11. ~~implement battle resolver~~ — done;
 12. ~~implement round-end cleanup~~ — done;
 13. ~~implement Arena Collapse~~ — done;
-14. continue through the X1 order defined in `ARCHITECTURE.md`;
-15. add tests as each subsystem is implemented.
+14. ~~implement effect resolver primitives~~ — done;
+15. continue through the X1 order defined in `ARCHITECTURE.md`;
+16. add tests as each subsystem is implemented.
 
 Do not proceed to X2 until all X1 exit criteria in `PHASES_AND_WORKFLOW.md` pass.
 
 ## Next Concrete Task
 
-**Implement effect resolver primitives (ARCHITECTURE.md §18 step 13).**
+**Implement deck exhaustion, scoring and tie-breaker (ARCHITECTURE.md §18 step 14).**
