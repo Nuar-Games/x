@@ -32,6 +32,10 @@ Do not reopen X0 for optional polish or hypothetical edge cases. Reopen only if 
 - `DECISIONS.md` — durable architectural decisions and conflict resolutions
 - `PROJECT_STATE.md` — current milestone/status
 
+## Rules Version
+
+Current rules version: **0.2.0** (see `GAME_RULES.md`, D-005 and D-009).
+
 ## Current Implementation State
 
 - X0 establishment is closed.
@@ -41,7 +45,18 @@ Do not reopen X0 for optional polish or hypothetical edge cases. Reopen only if 
 - Deterministic resolution and seeded RNG requirements are defined.
 - Card definitions vs card instances are separated architecturally.
 - Test layers and golden-match requirements are defined.
-- No executable game engine code exists yet.
+- Repo skeleton exists (D-008): TypeScript monorepo, Vitest, CI, architecture boundary checks, determinism check.
+- Greybox Three.js client boots and renders an empty 2.5D table (D-007).
+- Card data (card-set 0.2.0) lives in `packages/cards/data/`: full 30-card set from CARD DATABASE.xlsx, 10-card engine-proof subset, and per-card effect cases. All validated by tests.
+- Canonical serializable game-state types are implemented in `packages/engine/src/state.ts`.
+- Deterministic seeded RNG is implemented in `packages/engine/src/rng.ts` with deterministic shuffle and bounded integer generation. It is pure (D-012).
+- Production match setup enforces 30–50 cards, max 2 copies per name, known cards and no deferred cards. A separate test-only helper allows sub-30 fixture decks (D-010, D-012).
+- Turn-state machine (`packages/engine/src/turn.ts`): automatic turn-start draw, hand-limit check, turn end and hand-over to the next player. Stops at REQUIRED_VS_DEPLOYMENT or START_OF_TURN_VS_ACTION for player input.
+- Hand limit: 6 on each player's opening turn, 5 from their second turn; `DISCARD_FOR_HAND_LIMIT` command moves chosen cards to Zone Tepi.
+- VS step is implemented: required deployment from hand in ATK/DEF, explicit keep-as-is, one start-of-turn ATK/DEF position change, and voluntary replacement. Voluntary replacement captures the old VS into the opponent's Zone X before the new VS is deployed.
+- Normal VS choice is consumed by advancing immediately to `EFFECT_ACTIONS`, which also enforces the newly deployed/replacement position lock for the rest of that turn.
+- Commands return accepted (new state + events) or rejected (unchanged state + stable code).
+- Known placeholder: an empty deck at turn-start draw throws until deck exhaustion and scoring are implemented (X1 step 14).
 - No UI implemented yet.
 - No AI implemented yet.
 - No X Supabase backend created yet.
@@ -68,7 +83,11 @@ Do not reopen X0 for optional polish or hypothetical edge cases. Reopen only if 
 - anti-solitaire design law
 - deck exhaustion ends match after applicable resolution
 - Zone X score determines winner
-- simplified Mega X-derived tie-breaker
+- tie-breaker by shuffled non-Zone-X pool and printed ATK; unbreakable tie = draw
+- dual-use cards (VS or Effect role)
+- only ATK-position VS can attack
+- opening-turn 6-card hand allowance
+- Arena Collapse at end of third inactive turn, counter reset, deploy-only continuation
 
 ## X0 Closure Record
 
@@ -96,22 +115,36 @@ No other known contradiction currently blocks implementation of the base headles
 
 `DECISIONS.md` records that the authoritative early-phase order is X0 Rules -> X1 Headless Engine -> X2 Local 2D Arena. This resolves the conflicting early summary line in the constitution in favor of Rule 2, Rule 25, the Core Development Law, and the phase workflow.
 
+## Pre-X1 Audit Record
+
+The pre-X1 audit found six rules gaps and several repo issues. All are resolved:
+- rules gaps resolved in `GAME_RULES.md` 0.1.0 (D-005);
+- stale X0 transition text removed from `PHASES_AND_WORKFLOW.md`;
+- constitution development order corrected (D-006);
+- `BACKLOG.md`, `README.md`, `.gitignore` added.
+
+## Branch Workflow
+
+All X1 work happens on branches and merges into `main` (constitution Rule 18).
+
 ## Current Required Work — X1
 
 The next work is implementation, not more establishment.
 
 Immediate sequence:
-1. choose and record the implementation language/tooling only when code creation begins;
-2. create the engine source/test skeleton;
-3. implement serializable state and card models;
-4. implement deterministic RNG;
-5. implement match setup and opening draw;
-6. implement turn-state machine and hand-cap enforcement;
-7. continue through the X1 order defined in `ARCHITECTURE.md`;
-8. add tests as each subsystem is implemented.
+1. ~~add the engine-proof card set~~ — done (10 cards);
+2. ~~choose tooling~~ — done (D-008);
+3. ~~create the engine source/test skeleton~~ — done;
+4. ~~implement serializable state and card models~~ — done;
+5. ~~implement deterministic RNG~~ — done;
+6. ~~implement match setup and opening draw~~ — done;
+7. ~~implement turn-state machine and hand-cap enforcement~~ — done;
+8. ~~implement VS deployment / position / replacement~~ — done;
+9. continue through the X1 order defined in `ARCHITECTURE.md`;
+9. add tests as each subsystem is implemented.
 
 Do not proceed to X2 until all X1 exit criteria in `PHASES_AND_WORKFLOW.md` pass.
 
 ## Next Concrete Task
 
-**Begin executable X1 implementation: engine source/test skeleton, canonical state types, card models, deterministic RNG, and setup/turn-state tests.**
+**Implement Effect Zone and STA capacity (ARCHITECTURE.md §18 step 8): Effect occupancy, STA-derived capacity, normal 5-slot limit, voluntary Effect removal, and forced excess removal when effective STA falls below occupancy.**

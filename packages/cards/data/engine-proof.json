@@ -1,0 +1,16 @@
+{
+  "cardSetVersion": "0.2.0",
+  "source": "subset of cards.0.2.0.json",
+  "cards": [
+    {"id":"X001","no":1,"name":"XANDER SI TUKANG CANGKUL","star":6,"atk":600,"def":400,"sta":3,"effectText":"AMBIL SATU KAD DARI DECK.","effect":{"family":"DRAW","count":1,"from":"OWN_DECK"}},
+    {"id":"X002","no":2,"name":"SINGAU","star":9,"atk":999,"def":900,"sta":5,"effectText":"ATK KAD VS LAWAN MENJADI 0.","effect":{"family":"SET_STAT","target":"OPPONENT_VS","stat":"ATK","value":0}},
+    {"id":"X004","no":4,"name":"TABUAN BARA","star":7,"atk":500,"def":450,"sta":2,"effectText":"TOLAK 100 ATK KAD VS LAWAN.","effect":{"family":"MODIFY_STAT","target":"OPPONENT_VS","stat":"ATK","delta":-100}},
+    {"id":"X005","no":5,"name":"ARASHMAN SI PENENUN BAYANG","star":7,"atk":700,"def":650,"sta":3,"effectText":"SEMUA KAD EFFECT LAWAN DIMUSNAHKAN.","effect":{"family":"DESTROY_ALL","target":"OPPONENT_EFFECT_ZONE"}},
+    {"id":"X006","no":6,"name":"BARA NANDEZ","star":7,"atk":600,"def":550,"sta":3,"effectText":"KAD VS LAWAN DITUKAR KEPADA POSISI DEFEND.","effect":{"family":"SET_POSITION","target":"OPPONENT_VS","position":"DEF"}},
+    {"id":"X008","no":8,"name":"RATU TABUAN LANGIT","star":7,"atk":500,"def":450,"sta":2,"effectText":"TOLAK STA KAD VS LAWAN SEBANYAK 3.","effect":{"family":"MODIFY_STAT","target":"OPPONENT_VS","stat":"STA","delta":-3}},
+    {"id":"X013","no":13,"name":"NAGA RIBUT AIS","star":7,"atk":800,"def":500,"sta":4,"effectText":"TOLAK 200 DEF KAD VS LAWAN. LAWAN TIDAK DAPAT MEMBUAT SERANGAN UNTUK 1 KALI.","effect":{"family":"SEQUENCE","steps":[{"family":"MODIFY_STAT","target":"OPPONENT_VS","stat":"DEF","delta":-200},{"family":"BLOCK_ATTACKS","target":"OPPONENT","count":1}]}},
+    {"id":"X019","no":19,"name":"KAPORES THE FIGHTER","star":4,"atk":300,"def":100,"sta":3,"effectText":"TOLAK 1 STA KAD VS PEMAIN DAN +1000 ATK KEPADA KAD VS TERSEBUT.","effect":{"family":"SEQUENCE","steps":[{"family":"MODIFY_STAT","target":"OWN_VS","stat":"STA","delta":-1},{"family":"MODIFY_STAT","target":"OWN_VS","stat":"ATK","delta":1000}],"duration":"UNTIL_ROUND_END"}},
+    {"id":"X021","no":21,"name":"ULAR PELARI","star":2,"atk":50,"def":30,"sta":2,"effectText":"STA KAD VS LAWAN MENJADI 0.","effect":{"family":"SET_STAT","target":"OPPONENT_VS","stat":"STA","value":0}},
+    {"id":"X030","no":30,"name":"PIPIT PEMBURU","star":4,"atk":200,"def":150,"sta":2,"effectText":"AMBIL 5 KAD DARI DECK. BUANG 2 DARIPADA KAD DITANGAN KE ZON TEPI (DISCARD ZONE).","effect":{"family":"SEQUENCE","steps":[{"family":"DRAW","count":5,"from":"OWN_DECK"},{"family":"DISCARD_CHOSEN","count":2,"from":"OWN_HAND","to":"OWN_ZONE_TEPI"}]}}
+  ]
+}

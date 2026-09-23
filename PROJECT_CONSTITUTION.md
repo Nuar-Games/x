@@ -22,16 +22,15 @@ For all work on this repository:
 The project must advance in this order:
 
 1. Rules
-2. Local playable prototype
-3. Tested headless game engine
-4. Local UI
-5. AI
-6. Persistence
-7. Accounts
-8. Online multiplayer
-9. Presentation polish
-10. Progression
-11. Monetization
+2. Tested headless game engine
+3. Local 2D arena (local UI)
+4. AI
+5. Persistence
+6. Accounts
+7. Online multiplayer
+8. Presentation polish
+9. Progression
+10. Monetization
 
 Later stages must not dictate or destabilize earlier stages.
 
@@ -49,7 +48,7 @@ It must cover at minimum:
 - hand size
 - turn structure
 - phases
-- card types
+- card roles / playable modes
 - resource system
 - targeting
 - combat
@@ -246,6 +245,8 @@ A visual failure must not corrupt authoritative match state.
 - reconnect works
 
 A functional 2D implementation comes first.
+
+Amended by D-007: X2 may use a greybox 2.5D renderer (tilted camera, card planes) as long as it stays presentation-only. Final art, VFX and 3D avatars remain blocked until X6.
 
 Presentation must never become the foundation of gameplay correctness.
 

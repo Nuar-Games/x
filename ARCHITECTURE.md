@@ -85,7 +85,7 @@ Immutable card-set data should contain:
 - printed ATK
 - printed DEF
 - printed STA
-- effect definition(s)
+- effect definition(s), optional — a card without one cannot be played into the Effect Zone
 - rules/card-set version metadata
 
 ### Card Instance
@@ -114,6 +114,7 @@ Initial command vocabulary:
 - `PLAY_EFFECT`
 - `ATTACK`
 - `PASS`
+- `DISCARD_FOR_HAND_LIMIT` (GAME_RULES.md §3: the player chooses which cards to discard when over the hand limit after drawing)
 
 Automatic engine operations such as draw, round cleanup, capture, Arena Collapse, scoring, and match-end checks are internal transitions, not client-authoritative results.
 
@@ -188,14 +189,18 @@ Logical stages:
 
 - `TURN_START_DRAW`
 - `HAND_LIMIT_ENFORCEMENT`
-- `START_OF_TURN_VS_ACTION`
+- `REQUIRED_VS_DEPLOYMENT` (only when the player has no VS)
+- `START_OF_TURN_VS_ACTION` (only when the player has a surviving VS)
 - `EFFECT_ACTIONS`
 - `COMBAT_OR_PASS`
+- `ARENA_COLLAPSE_CHECK`
+- `POST_COLLAPSE_DEPLOYMENT` (only when collapse triggered; no Effects or attacks follow)
 - `TURN_END`
 
 Important rule lock:
 
 At `START_OF_TURN_VS_ACTION`, a player may choose at most one normal VS action:
+- keep it as-is;
 - change the surviving VS position; **or**
 - voluntarily replace the current VS.
 
@@ -289,10 +294,12 @@ All gameplay randomness must route through one deterministic RNG abstraction own
 Initial required random use:
 
 - deck shuffle
-- tie-breaker shuffle
+- tie-breaker pool shuffle (all owned cards not in Zone X)
 - future card effects only when explicitly defined
 
 No gameplay module may call uncontrolled random functions directly.
+
+The RNG is pure: each call returns the value and the next RNG state. It never mutates the RNG it is given, so an earlier `GameState` is never changed by later commands.
 
 ## 16. Versioning
 
@@ -328,6 +335,8 @@ Every fixed engine bug receives a test.
 ### Golden matches
 
 Fixed deck lists + fixed seed + fixed command sequence + exact expected final state/winner.
+
+Golden-match and engine-test decks may be below 30 cards (D-010). That exception lives only in test code: production deck validation has no switch, flag or parameter that disables the 30–50 / max-2 limits. Test fixtures build match state through a test-only helper instead.
 
 ## 18. Initial X1 Implementation Order
 

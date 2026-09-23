@@ -1,0 +1,23 @@
+{
+  "name": "x-the-card-game",
+  "private": true,
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "boundaries": "depcruise packages apps --config .dependency-cruiser.cjs",
+    "determinism": "node scripts/check-determinism.mjs",
+    "build": "pnpm -r build",
+    "check": "pnpm typecheck && pnpm test && pnpm boundaries && pnpm determinism && pnpm build",
+    "dev": "pnpm --filter @x/client dev"
+  },
+  "devDependencies": {
+    "@types/node": "22",
+    "dependency-cruiser": "^16.10.0",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  }
+}
