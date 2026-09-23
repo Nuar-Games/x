@@ -49,6 +49,8 @@ describe("deck exhaustion and match end (GAME_RULES.md §19–20)", () => {
     let state = setupTestMatch(testInput(1402));
     state = putVs(state, "P1", "ATK");
     state = putVs(state, "P2", "ATK");
+    const p1Vs = state.players.P1.vs!;
+    const p1VsDefinition = state.cardInstances[p1Vs]!.definitionId;
     const source = state.players.P1.hand[0]!;
     const sourceDefinition = state.cardInstances[source]!.definitionId;
     const keep = state.players.P1.deck[0]!;
@@ -61,6 +63,7 @@ describe("deck exhaustion and match end (GAME_RULES.md §19–20)", () => {
       turnStage: "EFFECT_ACTIONS",
       cardDefinitions: {
         ...state.cardDefinitions,
+        [p1VsDefinition]: { ...state.cardDefinitions[p1VsDefinition]!, sta: 6 },
         [sourceDefinition]: { ...state.cardDefinitions[sourceDefinition]!, effect: { family: "DRAW", count: 5, from: "OWN_DECK" } }
       }
     };
