@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { advance, applyCommand, type GameState } from "../src/index.ts";
-import { setupTestMatch, withPlayer, withState } from "./helpers/setup-test-match.ts";
+import { setupTestMatch, withPlayer } from "./helpers/setup-test-match.ts";
 import { testInput } from "./fixtures.ts";
 
 function requiredDeployment(): GameState {
