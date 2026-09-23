@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { applyCommand, effectiveStat, type EffectSpec, type GameState } from "../src/index.ts";
 import { moveCard } from "../src/zones.ts";
-import { setupTestMatch, withPlayer } from "./helpers/setup-test-match.ts";
+import { setupTestMatch } from "./helpers/setup-test-match.ts";
 import { testInput } from "./fixtures.ts";
 
 function effectStage(): GameState {
@@ -9,7 +9,7 @@ function effectStage(): GameState {
   const p1Vs = start.players.P1.hand[0]!;
   const p2Vs = start.players.P2.hand[0]!;
   const p1Def = start.cardInstances[p1Vs]!.definitionId;
-  let next: GameState = {
+  const next: GameState = {
     ...start,
     activePlayerId: "P1",
     turnStage: "EFFECT_ACTIONS",
