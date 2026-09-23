@@ -2,7 +2,7 @@
 
 Status: **ESTABLISHMENT RULESET — LOCKED FOR X1**
 
-Rules version: **0.2.1**
+Rules version: **0.2.2**
 
 This document records only rules explicitly established by the creator. No implementation may invent, reinterpret, or imply unstated game behavior.
 
@@ -344,11 +344,13 @@ Arena Collapse is checked when the player would otherwise finish their turn. If 
 3. All Effect cards for both players are sent to Zone Tepi.
 4. No capture points are awarded for those cards.
 5. The inactivity counter resets to 0.
-6. The player whose turn triggered the collapse immediately deploys a new VS in ATK or DEF position.
+6. The player whose turn triggered the collapse immediately deploys a new VS in ATK or DEF position if they have a card available in hand. If they have no card available to deploy, this deployment is skipped and the turn ends. On their next normal turn they draw, the hand limit is enforced, and because they have no VS they deploy one (§6).
 7. That deployment is the only continuation after the collapse. The player does not play Effects or attack.
 8. The turn ends and normal turn order continues.
 
 Playing an Effect or performing an attack resets the consecutive inactivity sequence.
+
+An attack prevented by an attack restriction (such as "cannot attack for 1 time") is not an attack for this rule. The attempt consumes the restriction, but no attack occurs, so it does not reset the counter. Only an attack that proceeds to battle counts.
 
 Deploying a VS (including the post-collapse deployment) does not count as an action for Arena Collapse.
 

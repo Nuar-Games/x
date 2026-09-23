@@ -150,3 +150,52 @@ describe("third inactive turn collapse", () => {
     expect(deployed.state.players[playerId].vs).toBe(replacement);
   });
 });
+
+describe("no card to deploy after collapse (GAME_RULES.md §13 step 6, D-015)", () => {
+  it("skips the post-collapse deployment and ends the turn instead of waiting forever", () => {
+    let state = afterTwoInactiveTurns();
+    const playerId = state.activePlayerId;
+    if (state.turnStage === "HAND_LIMIT_ENFORCEMENT") {
+      state = must(state, {
+        type: "DISCARD_FOR_HAND_LIMIT",
+        playerId,
+        cardInstanceIds: state.players[playerId].hand.slice(0, state.players[playerId].hand.length - 5)
+      }).state;
+    }
+    state = must(state, { type: "KEEP_VS", playerId }).state;
+    // Empty the hand (test setup) so there is nothing to deploy after the collapse.
+    for (const id of [...state.players[playerId].hand]) {
+      state = moveCard(state, { instanceId: id, fromPlayerId: playerId, from: "HAND", toPlayerId: playerId, to: "ZONE_TEPI", reason: "HAND_LIMIT_DISCARD" }, []);
+    }
+
+    const result = must(state, { type: "PASS", playerId });
+    const types = result.events.map((event) => event.type);
+    expect(types).toContain("ARENA_COLLAPSED");
+    expect(types).toContain("POST_COLLAPSE_DEPLOYMENT_SKIPPED");
+    expect(types.indexOf("POST_COLLAPSE_DEPLOYMENT_SKIPPED")).toBeLessThan(types.indexOf("TURN_ENDED"));
+    expect(result.state.activePlayerId).not.toBe(playerId);
+    expect(result.state.players[playerId].vs).toBeNull();
+  });
+
+  it("that player deploys normally on their next turn after drawing", () => {
+    let state = afterTwoInactiveTurns();
+    const playerId = state.activePlayerId;
+    if (state.turnStage === "HAND_LIMIT_ENFORCEMENT") {
+      state = must(state, {
+        type: "DISCARD_FOR_HAND_LIMIT",
+        playerId,
+        cardInstanceIds: state.players[playerId].hand.slice(0, state.players[playerId].hand.length - 5)
+      }).state;
+    }
+    state = must(state, { type: "KEEP_VS", playerId }).state;
+    for (const id of [...state.players[playerId].hand]) {
+      state = moveCard(state, { instanceId: id, fromPlayerId: playerId, from: "HAND", toPlayerId: playerId, to: "ZONE_TEPI", reason: "HAND_LIMIT_DISCARD" }, []);
+    }
+    state = must(state, { type: "PASS", playerId }).state;
+    // Opponent (no VS after collapse) deploys and passes.
+    state = deployAndPass(state).state;
+    expect(state.activePlayerId).toBe(playerId);
+    expect(state.players[playerId].hand).toHaveLength(1);
+    expect(state.turnStage).toBe("REQUIRED_VS_DEPLOYMENT");
+  });
+});

@@ -58,7 +58,7 @@ describe("ATTACK", () => {
     const result = applyCommand(state, { type: "ATTACK", playerId: "P2" });
     if (!result.accepted) throw new Error(result.code);
     const types = result.events.map((e) => e.type);
-    expect(types.indexOf("ATTACK_DECLARED")).toBeLessThan(types.indexOf("BATTLE_RESOLVED"));
+    expect(types.indexOf("ATTACK_ATTEMPTED")).toBeLessThan(types.indexOf("BATTLE_RESOLVED"));
     expect(types.indexOf("BATTLE_RESOLVED")).toBeLessThan(types.indexOf("TURN_ENDED"));
     expect(result.state.activePlayerId).toBe("P1");
   });

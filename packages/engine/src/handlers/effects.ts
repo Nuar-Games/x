@@ -15,7 +15,7 @@ export function playEffect(state: GameState, command: PlayEffectCommand): Handle
   if (!player.hand.includes(command.cardInstanceId)) return reject("CARD_NOT_IN_HAND");
   const instance = state.cardInstances[command.cardInstanceId];
   const definition = instance ? state.cardDefinitions[instance.definitionId] : undefined;
-  if (!definition?.hasPlayableEffect) return reject("CARD_HAS_NO_EFFECT");
+  if (definition?.effect === undefined) return reject("CARD_HAS_NO_EFFECT");
   if (player.effectZone.length >= effectCapacity(state, command.playerId)) {
     return reject(player.effectZone.length >= effectSlotLimit(state, command.playerId) ? "EFFECT_ZONE_FULL" : "INSUFFICIENT_STA");
   }

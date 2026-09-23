@@ -146,7 +146,10 @@ export type EngineEvent =
     }
   | { readonly type: "ROUND_ENDED"; readonly roundNumber: number }
   | { readonly type: "ARENA_COLLAPSED"; readonly triggeringPlayerId: PlayerId; readonly inactiveTurns: number }
-  | { readonly type: "ATTACK_DECLARED"; readonly playerId: PlayerId }
+  | { readonly type: "POST_COLLAPSE_DEPLOYMENT_SKIPPED"; readonly playerId: PlayerId }
+  /** The player tried to attack. Not an attack by itself: see ATTACK_PREVENTED / BATTLE_RESOLVED. */
+  | { readonly type: "ATTACK_ATTEMPTED"; readonly playerId: PlayerId }
+  /** The attempt was stopped by an attack restriction. No attack occurred (GAME_RULES.md §13). */
   | { readonly type: "ATTACK_PREVENTED"; readonly playerId: PlayerId; readonly sourceInstanceId: CardInstanceId }
   | { readonly type: "PASSED"; readonly playerId: PlayerId }
   | {

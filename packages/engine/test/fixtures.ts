@@ -1,12 +1,15 @@
 import type { MatchSetupInput, SetupCardDefinition } from "../src/index.ts";
 
+/** A playable effect with no gameplay result, so generic fixture cards can be played as Effects. */
+export const NEUTRAL_EFFECT = { family: "MODIFY_STAT", target: "OWN_VS", stat: "ATK", delta: 0 } as const;
+
 export const definitions: readonly SetupCardDefinition[] = Array.from({ length: 20 }, (_, index) => ({
   id: `X${String(index + 1).padStart(3, "0")}`,
   name: `Card ${index + 1}`,
   atk: 500 + index,
   def: 400 + index,
   sta: (index % 5) + 1,
-  hasPlayableEffect: true
+  effect: NEUTRAL_EFFECT
 }));
 
 /** 30 cards: two copies of the first 15 definitions. */
