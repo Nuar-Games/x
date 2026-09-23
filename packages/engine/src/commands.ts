@@ -1,4 +1,4 @@
-import type { CardInstanceId, GameState, PlayerId, TurnStage, VsPosition, Zone } from "./state.ts";
+import type { CardInstanceId, GameState, PlayerId, Stat, TurnStage, VsPosition, Zone } from "./state.ts";
 
 /**
  * Player commands (ARCHITECTURE.md §6). Types are added here only as each
@@ -12,7 +12,9 @@ export type Command =
   | ChangeVsPositionCommand
   | ReplaceVsCommand
   | PlayEffectCommand
-  | RemoveOwnEffectCommand;
+  | RemoveOwnEffectCommand
+  | AttackCommand
+  | PassCommand;
 
 /** GAME_RULES.md §3: over the hand limit after drawing, discard down before other actions. */
 export interface DiscardForHandLimitCommand {
@@ -63,6 +65,32 @@ export interface ReplaceVsCommand {
   readonly position: VsPosition;
 }
 
+/** GAME_RULES.md §9: attack with a VS in ATK position against the opponent's VS. Ends the Effect step. */
+export interface AttackCommand {
+  readonly type: "ATTACK";
+  readonly playerId: PlayerId;
+}
+
+/** GAME_RULES.md §9: pass instead of attacking. Requires the player to have a VS. Ends the Effect step. */
+export interface PassCommand {
+  readonly type: "PASS";
+  readonly playerId: PlayerId;
+}
+
+/** Why a card moved. Every move carries one, set by the engine (never by the client). */
+export type MoveReason =
+  | "DRAW"
+  | "HAND_LIMIT_DISCARD"
+  | "DEPLOY_VS"
+  | "VOLUNTARY_VS_REPLACEMENT"
+  | "PLAY_EFFECT"
+  | "VOLUNTARY_EFFECT_REMOVAL"
+  | "STA_EXCESS_REMOVAL"
+  | "BATTLE_DESTROYED"
+  | "BATTLE_TOP_DECK_CAPTURE"
+  | "BATTLE_TOP_DECK_DISCARD"
+  | "ROUND_END_CLEAR";
+
 export type RejectionCode =
   | "MATCH_NOT_ACTIVE"
   | "NOT_ACTIVE_PLAYER"
@@ -77,7 +105,9 @@ export type RejectionCode =
   | "EFFECT_ZONE_FULL"
   | "INSUFFICIENT_STA"
   | "EFFECT_REMOVAL_WINDOW_CLOSED"
-  | "RESOLUTION_PENDING";
+  | "RESOLUTION_PENDING"
+  | "VS_NOT_IN_ATK_POSITION"
+  | "NO_OPPONENT_VS";
 
 /** Structured transition events (ARCHITECTURE.md §8). The UI animates these; it never decides outcomes. */
 export type EngineEvent =
@@ -92,11 +122,30 @@ export type EngineEvent =
     }
   | {
       readonly type: "CARD_MOVED";
-      readonly playerId: PlayerId;
       readonly instanceId: CardInstanceId;
+      readonly fromPlayerId: PlayerId;
       readonly from: Zone;
+      readonly toPlayerId: PlayerId;
       readonly to: Zone;
-      readonly reason: "HAND_LIMIT_DISCARD" | "VOLUNTARY_VS_REPLACEMENT" | "PLAY_EFFECT" | "VOLUNTARY_EFFECT_REMOVAL" | "STA_EXCESS_REMOVAL";
+      readonly reason: MoveReason;
+    }
+  | { readonly type: "ROUND_ENDED"; readonly roundNumber: number }
+  | { readonly type: "ATTACK_DECLARED"; readonly playerId: PlayerId }
+  | { readonly type: "PASSED"; readonly playerId: PlayerId }
+  | {
+      readonly type: "BATTLE_RESOLVED";
+      readonly attackerId: PlayerId;
+      readonly defenderId: PlayerId;
+      readonly attackerAtk: number;
+      readonly defenderStat: Extract<Stat, "ATK" | "DEF">;
+      readonly defenderValue: number;
+      readonly outcome:
+        | "ATTACKER_WINS_ATK_VS_ATK"
+        | "DEFENDER_WINS_ATK_VS_ATK"
+        | "BOTH_DESTROYED_ATK_VS_ATK"
+        | "ATTACKER_PIERCES_DEF"
+        | "ATK_EQUALS_DEF"
+        | "ATTACKER_BLOCKED_BY_DEF";
     }
   | { readonly type: "VS_DEPLOYED"; readonly playerId: PlayerId; readonly instanceId: CardInstanceId; readonly position: VsPosition }
   | { readonly type: "VS_KEPT"; readonly playerId: PlayerId; readonly instanceId: CardInstanceId }

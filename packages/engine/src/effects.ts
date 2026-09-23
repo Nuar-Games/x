@@ -6,6 +6,7 @@ import type {
   Stat,
   StatModifier
 } from "./state.ts";
+import type { EngineEvent } from "./commands.ts";
 import { moveCard } from "./zones.ts";
 
 export const NORMAL_EFFECT_ZONE_LIMIT = 5;
@@ -22,38 +23,40 @@ function sortedModifiers(state: GameState, instanceId: CardInstanceId): StatModi
   return state.statModifiers.filter((modifier) => modifier.targetInstanceId === instanceId).sort((a, b) => a.order - b.order);
 }
 
-/** GAME_RULES.md §15: printed → set → swap → +/− → multiply, then floor at 0. */
+/**
+ * GAME_RULES.md §15 order: printed → set → swap → +/− → multiply, in play order
+ * within each step. GAME_RULES.md §5: any reduction that would push a stat
+ * below 0 stops at 0, so the floor is applied after every single modifier,
+ * not only to the final total.
+ */
 export function effectiveStats(state: GameState, instanceId: CardInstanceId): Readonly<Record<Stat, number>> {
   const definition = definitionForInstance(state, instanceId);
-  let atk = definition.atk;
-  let def = definition.def;
-  let sta = definition.sta;
+  const stats: Record<Stat, number> = { ATK: definition.atk, DEF: definition.def, STA: definition.sta };
+  const floor = (stat: Stat) => {
+    stats[stat] = Math.max(0, stats[stat]);
+  };
   const modifiers = sortedModifiers(state, instanceId);
 
   for (const modifier of modifiers) {
     if (modifier.kind !== "SET") continue;
-    if (modifier.stat === "ATK") atk = modifier.value;
-    if (modifier.stat === "DEF") def = modifier.value;
-    if (modifier.stat === "STA") sta = modifier.value;
+    stats[modifier.stat] = modifier.value;
+    floor(modifier.stat);
   }
   for (const modifier of modifiers) {
     if (modifier.kind !== "SWAP_ATK_DEF") continue;
-    [atk, def] = [def, atk];
+    [stats.ATK, stats.DEF] = [stats.DEF, stats.ATK];
   }
   for (const modifier of modifiers) {
     if (modifier.kind !== "ADD") continue;
-    if (modifier.stat === "ATK") atk += modifier.value;
-    if (modifier.stat === "DEF") def += modifier.value;
-    if (modifier.stat === "STA") sta += modifier.value;
+    stats[modifier.stat] += modifier.value;
+    floor(modifier.stat);
   }
   for (const modifier of modifiers) {
     if (modifier.kind !== "MULTIPLY") continue;
-    if (modifier.stat === "ATK") atk *= modifier.factor;
-    if (modifier.stat === "DEF") def *= modifier.factor;
-    if (modifier.stat === "STA") sta *= modifier.factor;
+    stats[modifier.stat] *= modifier.factor;
+    floor(modifier.stat);
   }
-
-  return { ATK: Math.max(0, atk), DEF: Math.max(0, def), STA: Math.max(0, sta) };
+  return stats;
 }
 
 export function effectiveStat(state: GameState, instanceId: CardInstanceId, stat: Stat): number {
@@ -87,7 +90,8 @@ export function requiredExcessEffectCount(state: GameState, playerId: PlayerId):
 export function removeExcessEffects(
   state: GameState,
   affectedPlayerId: PlayerId,
-  chosenIds: readonly CardInstanceId[]
+  chosenIds: readonly CardInstanceId[],
+  events: EngineEvent[]
 ): GameState {
   const required = requiredExcessEffectCount(state, affectedPlayerId);
   if (chosenIds.length !== required) throw new Error(`expected ${required} excess Effect card(s)`);
@@ -103,22 +107,9 @@ export function removeExcessEffects(
       fromPlayerId: affectedPlayerId,
       from: "EFFECT",
       toPlayerId: affectedPlayerId,
-      to: "ZONE_TEPI"
-    });
+      to: "ZONE_TEPI",
+      reason: "STA_EXCESS_REMOVAL"
+    }, events);
   }
   return next;
-}
-
-/** Backward-compatible helper for tests/resolvers that only need source-bound cleanup. */
-export function removeEffectSourceState(state: GameState, sourceInstanceId: CardInstanceId): GameState {
-  return {
-    ...state,
-    statModifiers: state.statModifiers.filter(
-      (modifier) => !(modifier.sourceInstanceId === sourceInstanceId && modifier.duration === "WHILE_SOURCE_ACTIVE")
-    ),
-    ruleModifiers: state.ruleModifiers.filter(
-      (modifier) => !(modifier.sourceInstanceId === sourceInstanceId && modifier.expiry === "SOURCE_LEAVES_EFFECT_ZONE")
-    ),
-    activeContinuousEffectIds: state.activeContinuousEffectIds.filter((id) => id !== sourceInstanceId)
-  };
 }

@@ -4,11 +4,10 @@ import {
   effectCapacity,
   effectSlotLimit,
   effectiveStats,
-  removeExcessEffects,
-  requiredExcessEffectCount,
   type GameState,
   type StatModifier
 } from "../src/index.ts";
+import { removeExcessEffects, requiredExcessEffectCount } from "../src/effects.ts";
 import { setupTestMatch, withPlayer } from "./helpers/setup-test-match.ts";
 import { testInput } from "./fixtures.ts";
 
@@ -51,6 +50,30 @@ describe("effective stats", () => {
   });
 });
 
+describe("stat floor applies at every reduction (GAME_RULES.md §5)", () => {
+  it("ATK 50, then −100, then +1000 gives 1000, not 950", () => {
+    const state = effectStage(4);
+    const vs = state.players.P1.vs!;
+    const defId = state.cardInstances[vs]!.definitionId;
+    const cardDefinitions = { ...state.cardDefinitions, [defId]: { ...state.cardDefinitions[defId]!, atk: 50 } };
+    const base = { sourceInstanceId: state.players.P1.hand[0]!, targetInstanceId: vs, duration: "WHILE_SOURCE_ACTIVE" as const };
+    const statModifiers: StatModifier[] = [
+      { ...base, id: "minus", order: 1, kind: "ADD", stat: "ATK", value: -100 },
+      { ...base, id: "plus", order: 2, kind: "ADD", stat: "ATK", value: 1000 }
+    ];
+    expect(effectiveStats({ ...state, cardDefinitions, statModifiers }, vs).ATK).toBe(1000);
+  });
+
+  it("STA reduction below 0 stops at 0", () => {
+    const state = effectStage(2);
+    const vs = state.players.P1.vs!;
+    const statModifiers: StatModifier[] = [
+      { id: "sta", sourceInstanceId: state.players.P1.hand[0]!, targetInstanceId: vs, order: 1, duration: "WHILE_SOURCE_ACTIVE", kind: "ADD", stat: "STA", value: -3 }
+    ];
+    expect(effectiveStats({ ...state, statModifiers }, vs).STA).toBe(0);
+  });
+});
+
 describe("Effect Zone capacity", () => {
   it("VS STA N permits N-1 Effect cards, capped at five", () => {
     expect(effectCapacity(effectStage(1), "P1")).toBe(0);
@@ -62,7 +85,7 @@ describe("Effect Zone capacity", () => {
     const state = effectStage(9);
     const locked = {
       ...state,
-      ruleModifiers: [{ id: "lock", sourceInstanceId: state.players.P2.hand[0]!, affectedPlayerId: "P1" as const, kind: "EFFECT_SLOT_LOCK" as const, value: 3, expiry: "SOURCE_LEAVES_EFFECT_ZONE" as const }]
+      ruleModifiers: [{ id: "lock", sourceInstanceId: state.players.P2.hand[0]!, affectedPlayerId: "P1" as const, kind: "EFFECT_SLOT_LOCK" as const, value: 3, expiresOn: ["SOURCE_LEAVES_EFFECT_ZONE" as const] }]
     };
     expect(effectSlotLimit(locked, "P1")).toBe(2);
     expect(effectCapacity(locked, "P1")).toBe(2);
@@ -70,7 +93,7 @@ describe("Effect Zone capacity", () => {
 });
 
 describe("PLAY_EFFECT", () => {
-  it("moves a playable Effect from hand into the Effect Zone and opens pending resolution", () => {
+  it("moves a playable Effect into the Effect Zone without blocking the rest of the turn", () => {
     const state = effectStage(3);
     const card = state.players.P1.hand[0]!;
     const result = applyCommand(state, { type: "PLAY_EFFECT", playerId: "P1", cardInstanceId: card });
@@ -79,7 +102,10 @@ describe("PLAY_EFFECT", () => {
     expect(result.state.players.P1.effectZone).toEqual([card]);
     expect(result.state.cardInstances[card]?.zone).toBe("EFFECT");
     expect(result.state.effectCardsPlayedThisTurn).toBe(1);
-    expect(result.state.pendingResolution).toEqual({ kind: "CARD_EFFECT", sourceInstanceId: card, actingPlayerId: "P1", remainingChoiceIds: [] });
+    expect(result.state.pendingResolution).toBeNull();
+    const second = result.state.players.P1.hand[0]!;
+    expect(applyCommand(result.state, { type: "PLAY_EFFECT", playerId: "P1", cardInstanceId: second }).accepted).toBe(true);
+    expect(applyCommand(result.state, { type: "PASS", playerId: "P1" }).accepted).toBe(true);
   });
 
   it("rejects when STA has no Effect capacity", () => {
@@ -121,7 +147,7 @@ describe("forced excess Effect removal", () => {
     const state = placeEffects(effectStage(3), 3);
     expect(requiredExcessEffectCount(state, "P1")).toBe(1);
     const chosen = state.players.P1.effectZone[1]!;
-    const next = removeExcessEffects(state, "P1", [chosen]);
+    const next = removeExcessEffects(state, "P1", [chosen], []);
     expect(next.players.P1.effectZone).not.toContain(chosen);
     expect(next.players.P1.zoneTepi).toContain(chosen);
     expect(next.cardInstances[chosen]?.zone).toBe("ZONE_TEPI");
@@ -134,13 +160,13 @@ describe("forced excess Effect removal", () => {
     const vs = state.players.P1.vs!;
     const modifier = (id: string, duration: "WHILE_SOURCE_ACTIVE" | "UNTIL_ROUND_END"): StatModifier => ({ id, sourceInstanceId: source, targetInstanceId: vs, order: 1, duration, kind: "ADD", stat: "ATK", value: 100 });
     const withMods = { ...state, statModifiers: [modifier("active", "WHILE_SOURCE_ACTIVE"), modifier("round", "UNTIL_ROUND_END")], activeContinuousEffectIds: [source, other] };
-    const next = removeExcessEffects(withMods, "P1", [source]);
-    expect(next.statModifiers.map((m) => m.id)).toEqual(["round"]);
+    const next = removeExcessEffects(withMods, "P1", [source], []);
+    expect(next.statModifiers.map((m: StatModifier) => m.id)).toEqual(["round"]);
     expect(next.activeContinuousEffectIds).toEqual([other]);
   });
 
   it("rejects the wrong number of chosen cards", () => {
     const state = placeEffects(effectStage(3), 3);
-    expect(() => removeExcessEffects(state, "P1", [])).toThrow(/expected 1/);
+    expect(() => removeExcessEffects(state, "P1", [], [])).toThrow(/expected 1/);
   });
 });

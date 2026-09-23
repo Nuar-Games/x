@@ -24,10 +24,10 @@ describe("turn-start draw", () => {
     expect(p1.hand).toHaveLength(6);
     expect(p1.turnsStarted).toBe(1);
     expect(result.state.turnStage).toBe("REQUIRED_VS_DEPLOYMENT");
-    expect(result.events.map((e) => e.type)).toEqual(["TURN_STARTED", "CARD_DRAWN", "STAGE_CHANGED", "STAGE_CHANGED"]);
+    expect(result.events.map((e) => e.type)).toEqual(["TURN_STARTED", "CARD_MOVED", "CARD_DRAWN", "STAGE_CHANGED", "STAGE_CHANGED"]);
     expect(result.events[0]).toMatchObject({ type: "TURN_STARTED", playerId: "P1", isOpeningTurn: true });
 
-    const drawn = result.events[1];
+    const drawn = result.events[2];
     if (drawn?.type !== "CARD_DRAWN") throw new Error("expected CARD_DRAWN");
     expect(result.state.cardInstances[drawn.instanceId]?.zone).toBe("HAND");
     expect(p1.hand.at(-1)).toBe(drawn.instanceId);
@@ -114,9 +114,10 @@ describe("DISCARD_FOR_HAND_LIMIT", () => {
     expect(result.events.slice(0, 2)).toEqual(
       chosen.map((instanceId) => ({
         type: "CARD_MOVED",
-        playerId: "P1",
         instanceId,
+        fromPlayerId: "P1",
         from: "HAND",
+        toPlayerId: "P1",
         to: "ZONE_TEPI",
         reason: "HAND_LIMIT_DISCARD"
       }))

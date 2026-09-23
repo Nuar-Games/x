@@ -88,7 +88,8 @@ export interface RuleModifierState {
   readonly affectedPlayerId: PlayerId;
   readonly kind: RuleModifierKind;
   readonly value: number;
-  readonly expiry: RuleModifierExpiry;
+  /** The modifier ends at the first of these that happens (e.g. an attack restriction ends when consumed OR when its source leaves). */
+  readonly expiresOn: readonly RuleModifierExpiry[];
 }
 
 export interface PendingResolutionState {

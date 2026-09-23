@@ -51,16 +51,19 @@ Current rules version: **0.2.0** (see `GAME_RULES.md`, D-005 and D-009).
 - Canonical serializable game-state types are implemented in `packages/engine/src/state.ts`.
 - Deterministic seeded RNG is implemented in `packages/engine/src/rng.ts` with deterministic shuffle and bounded integer generation. It is pure (D-012).
 - Production match setup enforces 30–50 cards, max 2 copies per name, known cards and no deferred cards. A separate test-only helper allows sub-30 fixture decks (D-010, D-012).
-- Turn-state machine (`packages/engine/src/turn.ts`): automatic turn-start draw, hand-limit check, turn end and hand-over to the next player. Stops at REQUIRED_VS_DEPLOYMENT or START_OF_TURN_VS_ACTION for player input.
+- Turn-state machine and single command pipeline (`packages/engine/src/turn.ts`, handlers in `src/handlers/`): draw, hand limit, VS step, Effect step, ATTACK/PASS, Arena Collapse check (pass-through until step 12), turn end. Losing your own VS mid-turn ends the turn. A full match can be played through commands only (see `test/flow.test.ts`).
 - Hand limit: 6 on each player's opening turn, 5 from their second turn; `DISCARD_FOR_HAND_LIMIT` command moves chosen cards to Zone Tepi.
 - VS step is implemented: required deployment from hand in ATK/DEF, explicit keep-as-is, one start-of-turn ATK/DEF position change, and voluntary replacement. Voluntary replacement captures the old VS into the opponent's Zone X before the new VS is deployed.
 - Normal VS choice is consumed by advancing immediately to `EFFECT_ACTIONS`, which also enforces the newly deployed/replacement position lock for the rest of that turn.
 - Commands return accepted (new state + events) or rejected (unchanged state + stable code).
 - Effect Zone / STA capacity is implemented: immutable card-definition snapshots in match state, effective-stat calculation in locked order, normal 5-slot cap, STA-derived Effect capacity, Effect placement pending later resolver work, voluntary Effect removal to opponent Zone X, slot-lock capacity, and deterministic forced excess removal to Zone Tepi.
 - Zone transitions are centralized in `packages/engine/src/zones.ts`. Normal gameplay movement routes through the engine-owned primitive, source-container membership is verified, leaving Effect cleans source-bound state, and Zone X cannot be used as a source under any transition.
-- Battle matrix resolution is implemented in `packages/engine/src/battle.ts`: ATK-vs-ATK destruction/capture, ATK-vs-DEF top-deck capture/discard outcomes, effective-stat use, DEF-attacker rejection, and round-end signaling when a VS leaves the VS Zone.
-- Round-end cleanup is implemented in `packages/engine/src/round.ts`: both Effect Zones move to Zone Tepi, surviving VS remains, round-bound modifiers expire, and `roundNumber` advances once.
-- Known placeholder: an empty deck at turn-start draw throws until deck exhaustion and scoring are implemented (X1 step 14).
+- Battle matrix resolution is implemented in `packages/engine/src/battle.ts` and reached through the ATTACK command.
+- Round end is engine-driven (D-014): any VS leaving the VS Zone ends the round inside `zones.ts`. Voluntary replacement ends the round (D-013).
+- Known placeholders:
+  - an empty deck at the turn-start draw, or when a battle needs a top-deck card, throws until deck exhaustion and scoring are implemented (X1 step 14);
+  - playing an Effect places it but does not apply its effect until the resolver (X1 step 13);
+  - the Arena Collapse check passes straight to turn end until X1 step 12.
 - No AI implemented yet.
 - No X Supabase backend created yet.
 - No X Vercel project created yet.

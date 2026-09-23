@@ -1,77 +1,42 @@
 /**
- * Turn-state machine (ARCHITECTURE.md §10) and hand-limit enforcement
- * (GAME_RULES.md §3).
+ * Turn-state machine (ARCHITECTURE.md §10) and the single command pipeline
+ * (ARCHITECTURE.md §7).
  *
- * `advance` runs automatic engine transitions until the match needs a player
- * decision. `applyCommand` validates a player command, applies it, then
- * advances. Both are pure: the input state is never modified.
+ * `advance` runs automatic engine transitions until a player decision is
+ * needed. `applyCommand` validates and applies one player command through a
+ * handler, applies engine-owned consequences, then advances. Both are pure.
  */
-import type {
-  ChangeVsPositionCommand,
-  Command,
-  CommandResult,
-  DeployVsCommand,
-  DiscardForHandLimitCommand,
-  EngineEvent,
-  KeepVsCommand,
-  PlayEffectCommand,
-  RemoveOwnEffectCommand,
-  ReplaceVsCommand,
-  TransitionResult
-} from "./commands.ts";
-import { effectCapacity } from "./effects.ts";
-import type { GameState, PlayerId, PlayerState, TurnStage } from "./state.ts";
+import type { Command, CommandResult, EngineEvent, TransitionResult } from "./commands.ts";
+import { changeVsPosition, deployVs, keepVs, replaceVs } from "./handlers/vs.ts";
+import { attack, pass } from "./handlers/combat.ts";
+import { playEffect, removeOwnEffect } from "./handlers/effects.ts";
+import { discardForHandLimit } from "./handlers/hand.ts";
+import { handLimitFor, isOpeningTurn } from "./hand-limit.ts";
+import { opponentOf, setStage, type HandlerResult } from "./internal/turn-helpers.ts";
+import type { GameState, PlayerState, TurnStage } from "./state.ts";
 import { moveCard } from "./zones.ts";
 
-export const OPENING_TURN_HAND_LIMIT = 6;
-export const HAND_LIMIT = 5;
-
-export function opponentOf(playerId: PlayerId): PlayerId {
-  return playerId === "P1" ? "P2" : "P1";
-}
-
-/** A player's opening turn is their first turn of the match (GAME_RULES.md §3). */
-export function isOpeningTurn(player: PlayerState): boolean {
-  return player.turnsStarted === 1;
-}
-
-/** 6 during the player's opening turn, 5 from their second turn onward. */
-export function handLimitFor(state: GameState, playerId: PlayerId): number {
-  return isOpeningTurn(state.players[playerId]) ? OPENING_TURN_HAND_LIMIT : HAND_LIMIT;
-}
+export { handLimitFor, isOpeningTurn, HAND_LIMIT, OPENING_TURN_HAND_LIMIT } from "./hand-limit.ts";
+export { opponentOf } from "./internal/turn-helpers.ts";
 
 /** §6 step 3: required deployment with no VS, otherwise the start-of-turn VS action. */
 function stageAfterHandLimit(player: PlayerState): TurnStage {
   return player.vs === null ? "REQUIRED_VS_DEPLOYMENT" : "START_OF_TURN_VS_ACTION";
 }
 
-function setStage(state: GameState, to: TurnStage, events: EngineEvent[]): GameState {
-  events.push({ type: "STAGE_CHANGED", playerId: state.activePlayerId, from: state.turnStage, to });
-  return { ...state, turnStage: to };
-}
-
-function withPlayer(state: GameState, player: PlayerState): GameState {
-  return { ...state, players: { ...state.players, [player.playerId]: player } };
-}
-
 function runTurnStartDraw(state: GameState, events: EngineEvent[]): GameState {
   const playerId = state.activePlayerId;
   const started: PlayerState = { ...state.players[playerId], turnsStarted: state.players[playerId].turnsStarted + 1 };
-  let next = withPlayer({ ...state, effectCardsPlayedThisTurn: 0 }, started);
+  let next: GameState = { ...state, effectCardsPlayedThisTurn: 0, players: { ...state.players, [playerId]: started } };
   events.push({ type: "TURN_STARTED", playerId, turnNumber: state.turnNumber, isOpeningTurn: isOpeningTurn(started) });
 
   const drawnId = started.deck[0];
   if (drawnId === undefined) {
+    // GAME_RULES.md §19: an empty deck at the normal draw ends the match. X1 step 14.
     throw new Error("deck exhaustion at turn-start draw is not implemented yet (X1 step 14)");
   }
 
-  next = moveCard(next, {
-    instanceId: drawnId,
-    fromPlayerId: playerId,
-    from: "DECK",
-    toPlayerId: playerId,
-    to: "HAND"
-  });
+  next = moveCard(next, { instanceId: drawnId, fromPlayerId: playerId, from: "DECK", toPlayerId: playerId, to: "HAND", reason: "DRAW" }, events);
   events.push({ type: "CARD_DRAWN", playerId, instanceId: drawnId });
   return setStage(next, "HAND_LIMIT_ENFORCEMENT", events);
 }
@@ -82,23 +47,34 @@ function runHandLimitCheck(state: GameState, events: EngineEvent[]): GameState |
   const handLimit = handLimitFor(state, playerId);
   if (player.hand.length <= handLimit) return setStage(state, stageAfterHandLimit(player), events);
 
-  events.push({
-    type: "HAND_LIMIT_EXCEEDED",
-    playerId,
-    handSize: player.hand.length,
-    handLimit,
-    discardCount: player.hand.length - handLimit
-  });
+  events.push({ type: "HAND_LIMIT_EXCEEDED", playerId, handSize: player.hand.length, handLimit, discardCount: player.hand.length - handLimit });
   return null;
 }
 
+/** Arena Collapse is X1 step 12. Until then this check always passes straight to turn end. */
+function runArenaCollapseCheck(state: GameState, events: EngineEvent[]): GameState {
+  return setStage(state, "TURN_END", events);
+}
+
+/** Ends the turn: "this turn" modifiers expire, then the other player's turn starts. */
 function runTurnEnd(state: GameState, events: EngineEvent[]): GameState {
   const endingPlayer = state.activePlayerId;
   events.push({ type: "TURN_ENDED", playerId: endingPlayer, turnNumber: state.turnNumber });
-  const next: GameState = { ...state, activePlayerId: opponentOf(endingPlayer), turnNumber: state.turnNumber + 1 };
+  const next: GameState = {
+    ...state,
+    statModifiers: state.statModifiers.filter((modifier) => modifier.duration !== "UNTIL_TURN_END"),
+    ruleModifiers: state.ruleModifiers.filter((modifier) => !modifier.expiresOn.includes("TURN_END")),
+    activePlayerId: opponentOf(endingPlayer),
+    turnNumber: state.turnNumber + 1
+  };
   return setStage(next, "TURN_START_DRAW", events);
 }
 
+/**
+ * Runs automatic transitions until a player decision is needed or the match ends.
+ * Waits at: HAND_LIMIT_ENFORCEMENT (over limit), REQUIRED_VS_DEPLOYMENT,
+ * START_OF_TURN_VS_ACTION, EFFECT_ACTIONS.
+ */
 export function advance(state: GameState): TransitionResult {
   const events: EngineEvent[] = [];
   let current = state;
@@ -116,187 +92,57 @@ export function advance(state: GameState): TransitionResult {
         current = next;
         continue;
       }
+      case "ARENA_COLLAPSE_CHECK":
+        current = runArenaCollapseCheck(current, events);
+        continue;
       case "TURN_END":
         current = runTurnEnd(current, events);
         continue;
-      default:
+      case "REQUIRED_VS_DEPLOYMENT":
+      case "START_OF_TURN_VS_ACTION":
+      case "EFFECT_ACTIONS":
+      case "COMBAT_OR_PASS":
+      case "POST_COLLAPSE_DEPLOYMENT":
         return { state: current, events };
     }
   }
 }
 
-function reject(state: GameState, code: Extract<CommandResult, { accepted: false }>["code"]): CommandResult {
-  return { accepted: false, state, code };
+/** GAME_RULES.md §6: losing your own VS during your turn (after the VS step) ends the turn. */
+function endTurnIfActivePlayerLostVs(state: GameState, events: EngineEvent[]): GameState {
+  const midTurn = state.turnStage === "EFFECT_ACTIONS" || state.turnStage === "COMBAT_OR_PASS";
+  if (midTurn && state.players[state.activePlayerId].vs === null) return setStage(state, "TURN_END", events);
+  return state;
 }
 
-function applyDiscardForHandLimit(state: GameState, command: DiscardForHandLimitCommand): CommandResult {
-  if (state.turnStage !== "HAND_LIMIT_ENFORCEMENT") return reject(state, "WRONG_STAGE");
-
-  const player = state.players[command.playerId];
-  const required = player.hand.length - handLimitFor(state, command.playerId);
-  if (required <= 0 || command.cardInstanceIds.length !== required) return reject(state, "WRONG_DISCARD_COUNT");
-  if (new Set(command.cardInstanceIds).size !== command.cardInstanceIds.length) return reject(state, "DUPLICATE_CARD");
-  if (!command.cardInstanceIds.every((id) => player.hand.includes(id))) return reject(state, "CARD_NOT_IN_HAND");
-
-  const events: EngineEvent[] = [];
-  let next = state;
-  for (const instanceId of command.cardInstanceIds) {
-    next = moveCard(next, {
-      instanceId,
-      fromPlayerId: command.playerId,
-      from: "HAND",
-      toPlayerId: command.playerId,
-      to: "ZONE_TEPI"
-    });
-    events.push({ type: "CARD_MOVED", playerId: command.playerId, instanceId, from: "HAND", to: "ZONE_TEPI", reason: "HAND_LIMIT_DISCARD" });
-  }
-
-  const advanced = advance(next);
-  return { accepted: true, state: advanced.state, events: [...events, ...advanced.events] };
-}
-
-function moveToEffectActions(state: GameState, events: EngineEvent[]): GameState {
-  return setStage(state, "EFFECT_ACTIONS", events);
-}
-
-function applyDeployVs(state: GameState, command: DeployVsCommand): CommandResult {
-  if (state.turnStage !== "REQUIRED_VS_DEPLOYMENT") return reject(state, "WRONG_STAGE");
-  const player = state.players[command.playerId];
-  if (!player.hand.includes(command.cardInstanceId)) return reject(state, "CARD_NOT_IN_HAND");
-  const events: EngineEvent[] = [];
-  let next = moveCard(state, {
-    instanceId: command.cardInstanceId,
-    fromPlayerId: command.playerId,
-    from: "HAND",
-    toPlayerId: command.playerId,
-    to: "VS",
-    toVsPosition: command.position
-  });
-  events.push({ type: "VS_DEPLOYED", playerId: command.playerId, instanceId: command.cardInstanceId, position: command.position });
-  next = moveToEffectActions(next, events);
-  return { accepted: true, state: next, events };
-}
-
-function applyKeepVs(state: GameState, command: KeepVsCommand): CommandResult {
-  if (state.turnStage !== "START_OF_TURN_VS_ACTION") return reject(state, "WRONG_STAGE");
-  const player = state.players[command.playerId];
-  if (player.vs === null || player.vsPosition === null) return reject(state, "NO_VS");
-  const events: EngineEvent[] = [{ type: "VS_KEPT", playerId: command.playerId, instanceId: player.vs }];
-  const next = moveToEffectActions(state, events);
-  return { accepted: true, state: next, events };
-}
-
-function applyChangeVsPosition(state: GameState, command: ChangeVsPositionCommand): CommandResult {
-  if (state.turnStage !== "START_OF_TURN_VS_ACTION") return reject(state, "WRONG_STAGE");
-  const player = state.players[command.playerId];
-  if (player.vs === null || player.vsPosition === null) return reject(state, "NO_VS");
-  if (player.vsPosition === command.position) return reject(state, "POSITION_UNCHANGED");
-  const events: EngineEvent[] = [{ type: "VS_POSITION_CHANGED", playerId: command.playerId, instanceId: player.vs, from: player.vsPosition, to: command.position }];
-  let next = withPlayer(state, { ...player, vsPosition: command.position });
-  next = moveToEffectActions(next, events);
-  return { accepted: true, state: next, events };
-}
-
-function applyReplaceVs(state: GameState, command: ReplaceVsCommand): CommandResult {
-  if (state.turnStage !== "START_OF_TURN_VS_ACTION") return reject(state, "WRONG_STAGE");
-  const player = state.players[command.playerId];
-  if (player.vs === null || player.vsPosition === null) return reject(state, "NO_VS");
-  if (!player.hand.includes(command.cardInstanceId)) return reject(state, "CARD_NOT_IN_HAND");
-
-  const oldVs = player.vs;
-  const opponentId = opponentOf(command.playerId);
-  const events: EngineEvent[] = [
-    { type: "CARD_MOVED", playerId: command.playerId, instanceId: oldVs, from: "VS", to: "ZONE_X", reason: "VOLUNTARY_VS_REPLACEMENT" },
-    { type: "VS_REPLACED", playerId: command.playerId, oldInstanceId: oldVs, newInstanceId: command.cardInstanceId, position: command.position }
-  ];
-
-  let next = moveCard(state, {
-    instanceId: oldVs,
-    fromPlayerId: command.playerId,
-    from: "VS",
-    toPlayerId: opponentId,
-    to: "ZONE_X"
-  });
-  next = moveCard(next, {
-    instanceId: command.cardInstanceId,
-    fromPlayerId: command.playerId,
-    from: "HAND",
-    toPlayerId: command.playerId,
-    to: "VS",
-    toVsPosition: command.position
-  });
-  next = moveToEffectActions(next, events);
-  return { accepted: true, state: next, events };
-}
-
-function applyPlayEffect(state: GameState, command: PlayEffectCommand): CommandResult {
-  if (state.turnStage !== "EFFECT_ACTIONS") return reject(state, "WRONG_STAGE");
-  if (state.pendingResolution !== null) return reject(state, "RESOLUTION_PENDING");
-  const player = state.players[command.playerId];
-  if (player.vs === null) return reject(state, "NO_VS");
-  if (!player.hand.includes(command.cardInstanceId)) return reject(state, "CARD_NOT_IN_HAND");
-  const instance = state.cardInstances[command.cardInstanceId];
-  if (!instance) return reject(state, "CARD_NOT_IN_HAND");
-  const definition = state.cardDefinitions[instance.definitionId];
-  if (!definition?.hasPlayableEffect) return reject(state, "CARD_HAS_NO_EFFECT");
-  if (player.effectZone.length >= effectCapacity(state, command.playerId)) {
-    const slotCount = player.effectZone.length;
-    const slotLimit = Math.max(0, 5 - state.ruleModifiers.filter((modifier) => modifier.affectedPlayerId === command.playerId && modifier.kind === "EFFECT_SLOT_LOCK").reduce((total, modifier) => total + modifier.value, 0));
-    return reject(state, slotCount >= slotLimit ? "EFFECT_ZONE_FULL" : "INSUFFICIENT_STA");
-  }
-
-  const events: EngineEvent[] = [
-    { type: "CARD_MOVED", playerId: command.playerId, instanceId: command.cardInstanceId, from: "HAND", to: "EFFECT", reason: "PLAY_EFFECT" },
-    { type: "EFFECT_PLAYED", playerId: command.playerId, instanceId: command.cardInstanceId }
-  ];
-  let next = moveCard(state, {
-    instanceId: command.cardInstanceId,
-    fromPlayerId: command.playerId,
-    from: "HAND",
-    toPlayerId: command.playerId,
-    to: "EFFECT"
-  });
-  next = {
-    ...next,
-    effectCardsPlayedThisTurn: state.effectCardsPlayedThisTurn + 1,
-    pendingResolution: { kind: "CARD_EFFECT", sourceInstanceId: command.cardInstanceId, actingPlayerId: command.playerId, remainingChoiceIds: [] }
-  };
-  return { accepted: true, state: next, events };
-}
-
-function applyRemoveOwnEffect(state: GameState, command: RemoveOwnEffectCommand): CommandResult {
-  if (state.turnStage !== "EFFECT_ACTIONS") return reject(state, "WRONG_STAGE");
-  if (state.pendingResolution !== null) return reject(state, "RESOLUTION_PENDING");
-  if (state.effectCardsPlayedThisTurn > 0) return reject(state, "EFFECT_REMOVAL_WINDOW_CLOSED");
-  const player = state.players[command.playerId];
-  if (!player.effectZone.includes(command.cardInstanceId)) return reject(state, "CARD_NOT_IN_EFFECT_ZONE");
-
-  const opponentId = opponentOf(command.playerId);
-  const next = moveCard(state, {
-    instanceId: command.cardInstanceId,
-    fromPlayerId: command.playerId,
-    from: "EFFECT",
-    toPlayerId: opponentId,
-    to: "ZONE_X"
-  });
-  const events: EngineEvent[] = [
-    { type: "CARD_MOVED", playerId: command.playerId, instanceId: command.cardInstanceId, from: "EFFECT", to: "ZONE_X", reason: "VOLUNTARY_EFFECT_REMOVAL" },
-    { type: "EFFECT_REMOVED", playerId: command.playerId, instanceId: command.cardInstanceId }
-  ];
-  return { accepted: true, state: next, events };
-}
-
-export function applyCommand(state: GameState, command: Command): CommandResult {
-  if (state.status !== "ACTIVE") return reject(state, "MATCH_NOT_ACTIVE");
-  if (command.playerId !== state.activePlayerId) return reject(state, "NOT_ACTIVE_PLAYER");
-
+function runHandler(state: GameState, command: Command): HandlerResult {
   switch (command.type) {
-    case "DISCARD_FOR_HAND_LIMIT": return applyDiscardForHandLimit(state, command);
-    case "DEPLOY_VS": return applyDeployVs(state, command);
-    case "KEEP_VS": return applyKeepVs(state, command);
-    case "CHANGE_VS_POSITION": return applyChangeVsPosition(state, command);
-    case "REPLACE_VS": return applyReplaceVs(state, command);
-    case "PLAY_EFFECT": return applyPlayEffect(state, command);
-    case "REMOVE_OWN_EFFECT": return applyRemoveOwnEffect(state, command);
+    case "DISCARD_FOR_HAND_LIMIT": return discardForHandLimit(state, command);
+    case "DEPLOY_VS": return deployVs(state, command);
+    case "KEEP_VS": return keepVs(state, command);
+    case "CHANGE_VS_POSITION": return changeVsPosition(state, command);
+    case "REPLACE_VS": return replaceVs(state, command);
+    case "PLAY_EFFECT": return playEffect(state, command);
+    case "REMOVE_OWN_EFFECT": return removeOwnEffect(state, command);
+    case "ATTACK": return attack(state, command);
+    case "PASS": return pass(state, command);
   }
+}
+
+/**
+ * The single command route (ARCHITECTURE.md §7). Every command goes:
+ * common checks → handler → engine-owned consequences → automatic transitions.
+ * A rejected command returns the exact input state.
+ */
+export function applyCommand(state: GameState, command: Command): CommandResult {
+  if (state.status !== "ACTIVE") return { accepted: false, state, code: "MATCH_NOT_ACTIVE" };
+  if (command.playerId !== state.activePlayerId) return { accepted: false, state, code: "NOT_ACTIVE_PLAYER" };
+
+  const handled = runHandler(state, command);
+  if (!handled.accepted) return { accepted: false, state, code: handled.code };
+
+  const events: EngineEvent[] = [...handled.events];
+  const settled = endTurnIfActivePlayerLostVs(handled.state, events);
+  const advanced = advance(settled);
+  return { accepted: true, state: advanced.state, events: [...events, ...advanced.events] };
 }
