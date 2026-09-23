@@ -17,10 +17,13 @@ jobs:
         with:
           ref: x1/step-13-5
           fetch-depth: 0
-      - name: Apply supplied step 13.5 patch
+      - name: Verify and apply supplied step 13.5 patch
         shell: bash
         run: |
+          sha256sum .step135/part0.b64 .step135/part1.b64 .step135/part2.b64 .step135/part3.b64 .step135/part4.b64
           cat .step135/part0.b64 .step135/part1.b64 .step135/part2.b64 .step135/part3.b64 .step135/part4.b64 | base64 -d > /tmp/x1-step-13-5.patch
+          sha256sum /tmp/x1-step-13-5.patch
+          test "$(sha256sum /tmp/x1-step-13-5.patch | cut -d' ' -f1)" = "585072cf0b71871a328abe7e3ad87fcd5aa7d20bf159b29257d1b99dae9dec39"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git am /tmp/x1-step-13-5.patch
