@@ -23,3 +23,15 @@ export { advance, applyCommand, handLimitFor, isOpeningTurn, opponentOf, HAND_LI
 export { enumerateLegalCommands } from "./legal-commands.ts";
 export { effectiveStats, effectiveStat, effectCapacity, effectSlotLimit, NORMAL_EFFECT_ZONE_LIMIT } from "./effects.ts";
 export { parseEffectSpec, type ParseResult } from "./effect-spec.ts";
+export {
+  viewFor,
+  eventsFor,
+  type PlayerView,
+  type OwnPlayerView,
+  type OpponentPlayerView,
+  type CardView,
+  type CardStatsView,
+  type RuleModifierView,
+  type PendingChoiceView,
+  type ViewEvent
+} from "./view.ts";
