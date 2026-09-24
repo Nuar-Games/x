@@ -447,4 +447,21 @@ Rules:
 - The renderer never compares an old state with a new state to work out what happened. Events are the only description of change.
 - A thin local match host (outside `render/`) owns the `GameState`, calls `applyCommand`, and hands the renderer `viewFor` + `enumerateLegalCommands` + `eventsFor`. Local hot-seat play switches `viewerId`.
 
-Enforced by `scripts/check-renderer-boundary.mjs` (part of `pnpm boundaries`): code under `apps/client/src/render/` may import engine **types** only and may not mention `GameState` or keep previous-state copies.
+Enforced as part of `pnpm boundaries`:
+
+- dependency-cruiser (`.dependency-cruiser.cjs`) checks every import: `render/` imports engine **types only** and never `host/`; `host/` never imports `three`, `render/`, `@x/cards` or `config/` (tests excepted for `config/`); no import may be unresolvable; no relative import may reach into another package's source;
+- `scripts/check-renderer-boundary.mjs` checks what imports cannot show: no mention of `GameState` and no previous-state copies in `render/`.
+
+## 22. X2 Local Match Host (D-019)
+
+`apps/client/src/host/createLocalMatchHost(input, initialViewer)`:
+
+- owns the `GameState` privately; its public interface has no state getter;
+- receives all setup data (seed, card definitions, both decks, match id, card-set version) from the caller. The default X2 setup is `apps/client/src/config/default-match.ts` (two copies of each of the 15 supported real cards); the host never creates a seed;
+- `getOutput()` returns `{ viewerId, stateVersion, view, legalCommands, events, eventStartIndex, eventEndIndex }` and has no side effects;
+- `legalCommands` is empty unless the viewer is the active player (who also owns every pending choice); it is cached per `stateVersion`;
+- `pickLegalCommand(stateVersion, index)` is the only way to act. Rejections, in order: `MATCH_RESOLVED`, `NOT_ACTING_VIEWER`, `STALE_VERSION`, `INVALID_INDEX`, `ENGINE_REJECTED`. Rejections change nothing;
+- one append-only event log, with an independent acknowledged position per viewer. `acknowledgeEvents(upToIndex)` moves only the current viewer's position and throws on an invalid index;
+- `setViewer` changes only the projection, never game state, RNG progression or `stateVersion`;
+- `HostOutput` and `HostResult` are JSON-safe;
+- `host/` compiles with no DOM library (`tsconfig.host.json`) and is included in the determinism scan.
