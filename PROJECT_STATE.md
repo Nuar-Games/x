@@ -65,6 +65,7 @@ Current rules version: **0.2.2** (see `GAME_RULES.md`, D-013 through D-016).
 - Effect resolver primitives are implemented for the locked 10-card proof vocabulary: DRAW, SET_STAT, MODIFY_STAT, DESTROY_ALL opponent Effects, SET_POSITION, BLOCK_ATTACKS, SEQUENCE and DISCARD_CHOSEN. Resolution is command-driven, explicit choices are serialized through `pendingResolution` / `RESOLVE_EFFECT_CHOICE`, STA=0 destruction and STA-excess consequences happen immediately, and attack restrictions are consumed by the next legal attack attempt.
 - Deck exhaustion / scoring / tie-breaker are implemented: normal-draw, Effect-draw and battle top-deck exhaustion resolve at the established boundary; Zone X is scored; tied scores use deterministic shuffled non-Zone-X pools and printed/base ATK; an unbreakable tie is a draw.
 - Legal command enumeration is implemented in `packages/engine/src/legal-commands.ts`. It returns every concrete command currently accepted by the engine, including exact hand-limit and pending-Effect choice combinations, and validates candidates through `applyCommand` so legality remains single-source.
+- Golden matches are implemented in `packages/engine/test/golden-matches.test.ts`: fixed test-only decks, fixed seeds and explicit command sequences are frozen against exact terminal snapshots. One fixture ends on a Zone X lead after combat; one crosses Arena Collapse and ends in an unbreakable draw.
 - No AI implemented yet.
 - No X Supabase backend created yet.
 - No X Vercel project created yet.
@@ -136,7 +137,7 @@ All X1 work happens on branches and merges into `main` (constitution Rule 18).
 
 ## Current Required Work — X1
 
-The implementation order in `ARCHITECTURE.md` §18 is complete through step 15:
+The implementation order in `ARCHITECTURE.md` §18 is complete:
 
 1. ~~types / serializable state model~~ — done;
 2. ~~card definition and instance model~~ — done;
@@ -153,10 +154,10 @@ The implementation order in `ARCHITECTURE.md` §18 is complete through step 15:
 13. ~~effect resolver primitives~~ — done;
 14. ~~deck exhaustion / scoring / tie-breaker~~ — done;
 15. ~~legal command enumeration~~ — done;
-16. **golden match fixtures** — next.
+16. ~~golden match fixtures~~ — done.
 
 Do not proceed to X2 until all X1 exit criteria in `PHASES_AND_WORKFLOW.md` pass.
 
 ## Next Concrete Task
 
-**Implement golden match fixtures (ARCHITECTURE.md §18 step 16), then run the X1 exit-gate audit.**
+**Run the X1 exit-gate audit against `GAME_RULES.md`, `ARCHITECTURE.md` §20 and `PHASES_AND_WORKFLOW.md`. Fix only concrete blockers found by that audit; if the gate passes, close X1 and move to X2.**
