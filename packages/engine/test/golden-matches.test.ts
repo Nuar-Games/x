@@ -32,9 +32,11 @@ function input(seed: number, definitions: readonly SetupCardDefinition[], prefix
 
 function runFixed(initial: GameState, commands: readonly Command[]): GameState {
   let state = advance(initial).state;
-  for (const command of commands) {
+  for (const [index, command] of commands.entries()) {
     const result = applyCommand(state, command);
-    if (!result.accepted) throw new Error(`golden command rejected: ${command.type} -> ${result.code}`);
+    if (!result.accepted) {
+      throw new Error(`golden command ${index + 1} rejected at turn ${state.turnNumber}/${state.turnStage}: ${command.type} -> ${result.code}`);
+    }
     state = result.state;
   }
   return state;
@@ -71,8 +73,10 @@ describe("golden matches (ARCHITECTURE.md §17–18 step 16)", () => {
       { type: "PASS", playerId: "P1" },
       { type: "DEPLOY_VS", playerId: "P2", cardInstanceId: "P2-007", position: "ATK" },
       { type: "ATTACK", playerId: "P2" },
+      { type: "DISCARD_FOR_HAND_LIMIT", playerId: "P1", cardInstanceIds: ["P1-007"] },
       { type: "DEPLOY_VS", playerId: "P1", cardInstanceId: "P1-003", position: "DEF" },
       { type: "PASS", playerId: "P1" },
+      { type: "DISCARD_FOR_HAND_LIMIT", playerId: "P2", cardInstanceIds: ["P2-004"] },
       { type: "KEEP_VS", playerId: "P2" },
       { type: "PASS", playerId: "P2" }
     ];
@@ -88,9 +92,11 @@ describe("golden matches (ARCHITECTURE.md §17–18 step 16)", () => {
       { type: "PASS", playerId: "P1" },
       { type: "DEPLOY_VS", playerId: "P2", cardInstanceId: "P2-002", position: "DEF" },
       { type: "PASS", playerId: "P2" },
+      { type: "DISCARD_FOR_HAND_LIMIT", playerId: "P1", cardInstanceIds: ["P1-004"] },
       { type: "KEEP_VS", playerId: "P1" },
       { type: "PASS", playerId: "P1" },
       { type: "DEPLOY_VS", playerId: "P1", cardInstanceId: "P1-006", position: "ATK" },
+      { type: "DISCARD_FOR_HAND_LIMIT", playerId: "P2", cardInstanceIds: ["P2-005"] },
       { type: "DEPLOY_VS", playerId: "P2", cardInstanceId: "P2-003", position: "DEF" },
       { type: "PASS", playerId: "P2" },
       { type: "KEEP_VS", playerId: "P1" },
