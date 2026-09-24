@@ -34,7 +34,7 @@ Do not reopen X0 for optional polish or hypothetical edge cases. Reopen only if 
 
 ## Rules Version
 
-Current rules version: **0.2.1** (see `GAME_RULES.md`, D-013 and D-014).
+Current rules version: **0.2.2** (see `GAME_RULES.md`, D-013 through D-016).
 
 ## Current Implementation State
 
@@ -59,12 +59,12 @@ Current rules version: **0.2.1** (see `GAME_RULES.md`, D-013 and D-014).
 - Effect Zone / STA capacity is implemented: immutable card-definition snapshots in match state, effective-stat calculation in locked order, normal 5-slot cap, STA-derived Effect capacity, voluntary Effect removal to opponent Zone X, slot-lock capacity, and deterministic forced excess removal to Zone Tepi.
 - Zone transitions are centralized in `packages/engine/src/zones.ts`. Normal gameplay movement routes through the engine-owned primitive, source-container membership is verified, leaving Effect cleans source-bound state, and Zone X cannot be used as a source under any transition.
 - Battle matrix resolution is implemented in `packages/engine/src/battle.ts` and reached through the ATTACK command.
-- Effect resolver (step 13) runs the proof-set vocabulary. Setup rejects cards whose effects the engine cannot run (D-016). All 10 real proof cards are tested through applyCommand (`test/proof-cards.test.ts`).
-- Arena Collapse (step 12) implemented; prevented attacks do not count as attacks and an empty hand skips post-collapse deployment (D-015).
+- Effect resolver runs the proof-set vocabulary. Setup rejects cards whose effects the engine cannot run (D-016). All 10 real proof cards are tested through `applyCommand` (`test/proof-cards.test.ts`).
+- Arena Collapse is implemented; prevented attacks do not count as attacks and an empty hand skips post-collapse deployment (D-015).
 - Round end is engine-driven (D-014): any VS leaving the VS Zone ends the round inside `zones.ts`. Voluntary replacement ends the round (D-013).
-- Arena Collapse is implemented: attack/Effect activity resets the inactivity sequence, inactive individual turns increment it, and the third consecutive inactive turn moves both VS and all Effects to Zone Tepi with no capture, resets the counter, ends the round once, requires the triggering player to deploy a new VS, then ends the turn.
 - Effect resolver primitives are implemented for the locked 10-card proof vocabulary: DRAW, SET_STAT, MODIFY_STAT, DESTROY_ALL opponent Effects, SET_POSITION, BLOCK_ATTACKS, SEQUENCE and DISCARD_CHOSEN. Resolution is command-driven, explicit choices are serialized through `pendingResolution` / `RESOLVE_EFFECT_CHOICE`, STA=0 destruction and STA-excess consequences happen immediately, and attack restrictions are consumed by the next legal attack attempt.
-- Known placeholder: an empty deck at the turn-start draw, during Effect draw, or when a battle needs a top-deck card throws until deck exhaustion and scoring are implemented (X1 step 14).
+- Deck exhaustion / scoring / tie-breaker are implemented: normal-draw, Effect-draw and battle top-deck exhaustion resolve at the established boundary; Zone X is scored; tied scores use deterministic shuffled non-Zone-X pools and printed/base ATK; an unbreakable tie is a draw.
+- Legal command enumeration is implemented in `packages/engine/src/legal-commands.ts`. It returns every concrete command currently accepted by the engine, including exact hand-limit and pending-Effect choice combinations, and validates candidates through `applyCommand` so legality remains single-source.
 - No AI implemented yet.
 - No X Supabase backend created yet.
 - No X Vercel project created yet.
@@ -136,28 +136,27 @@ All X1 work happens on branches and merges into `main` (constitution Rule 18).
 
 ## Current Required Work — X1
 
-The next work is implementation, not more establishment.
+The implementation order in `ARCHITECTURE.md` §18 is complete through step 15:
 
-Immediate sequence:
-1. ~~add the engine-proof card set~~ — done (10 cards);
-2. ~~choose tooling~~ — done (D-008);
-3. ~~create the engine source/test skeleton~~ — done;
-4. ~~implement serializable state and card models~~ — done;
-5. ~~implement deterministic RNG~~ — done;
-6. ~~implement match setup and opening draw~~ — done;
-7. ~~implement turn-state machine and hand-cap enforcement~~ — done;
-8. ~~implement VS deployment / position / replacement~~ — done;
-9. ~~implement Effect Zone and STA capacity~~ — done;
-10. ~~implement zone-transition invariants including Zone X~~ — done;
-11. ~~implement battle resolver~~ — done;
-12. ~~implement round-end cleanup~~ — done;
-13. ~~implement Arena Collapse~~ — done;
-14. ~~implement effect resolver primitives~~ — done;
-15. continue through the X1 order defined in `ARCHITECTURE.md`;
-16. add tests as each subsystem is implemented.
+1. ~~types / serializable state model~~ — done;
+2. ~~card definition and instance model~~ — done;
+3. ~~deterministic RNG abstraction~~ — done;
+4. ~~match setup and initial draw~~ — done;
+5. ~~turn-state machine~~ — done;
+6. ~~hand-cap enforcement~~ — done;
+7. ~~VS deployment / position / replacement~~ — done;
+8. ~~Effect Zone and STA capacity~~ — done;
+9. ~~zone-transition invariants including Zone X~~ — done;
+10. ~~battle resolver~~ — done;
+11. ~~round end~~ — done;
+12. ~~Arena Collapse~~ — done;
+13. ~~effect resolver primitives~~ — done;
+14. ~~deck exhaustion / scoring / tie-breaker~~ — done;
+15. ~~legal command enumeration~~ — done;
+16. **golden match fixtures** — next.
 
 Do not proceed to X2 until all X1 exit criteria in `PHASES_AND_WORKFLOW.md` pass.
 
 ## Next Concrete Task
 
-**Implement deck exhaustion, scoring and tie-breaker (ARCHITECTURE.md §18 step 14).**
+**Implement golden match fixtures (ARCHITECTURE.md §18 step 16), then run the X1 exit-gate audit.**
