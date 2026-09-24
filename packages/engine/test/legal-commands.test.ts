@@ -83,7 +83,8 @@ describe("legal command enumeration (ARCHITECTURE.md §18 step 15)", () => {
         choiceKind: "DISCARD_OWN_HAND",
         choiceCount: 2,
         affectedPlayerId: "P1",
-        remainingSteps: []
+        remainingSteps: [],
+        deckExhaustedByEffect: false
       }
     });
     const commands = enumerateLegalCommands(state);
