@@ -1,18 +1,12 @@
 // X2 renderer boundary (ARCHITECTURE.md §21, D-018).
-//
-// Code under apps/client/src/render/ draws the game. It receives:
-//   - a PlayerView (viewFor), never GameState;
-//   - the legal commands as data (enumerateLegalCommands), never runs rules;
-//   - ordered ViewEvents (eventsFor) to animate, never diffs states.
-// So it may import ENGINE TYPES ONLY, and may not mention GameState.
+// Import boundaries are enforced by dependency-cruiser. This text scan only
+// catches semantic/source-shape violations dependency resolution cannot see.
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = "apps/client/src/render";
 const RULES = [
   { pattern: /\bGameState\b/, why: "the renderer receives PlayerView from viewFor(), never GameState" },
-  { pattern: /^\s*import\s+(?!type\b)[^;]*from\s+["']@x\/engine["']/m, why: "import engine types only (`import type`); engine functions run outside the renderer" },
-  { pattern: /^\s*export\s+(?!type\b)[^;]*from\s+["']@x\/engine["']/m, why: "re-export engine types only" },
   { pattern: /\bprevState\b|\bpreviousState\b|\boldState\b/, why: "animate from ViewEvents, do not diff old/new states" }
 ];
 

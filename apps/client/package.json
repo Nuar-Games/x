@@ -5,11 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "typecheck": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.host.json",
     "test": "vitest run --passWithNoTests",
     "build": "vite build"
   },
   "dependencies": {
+    "@x/cards": "workspace:*",
     "@x/engine": "workspace:*",
     "three": "^0.170.0"
   },
