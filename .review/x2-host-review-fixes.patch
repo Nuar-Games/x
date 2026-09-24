@@ -1,0 +1,171 @@
+From b35f5aba3393cb95f4a92205ee5d854c7ca5b209 Mon Sep 17 00:00:00 2001
+From: Nuar-Games <nuargita96@gmail.com>
+Date: Thu, 24 Sep 2026 14:24:47 +0000
+Subject: [PATCH] fix(client): X2 host boundary gaps found in review; record
+ D-019
+
+---
+ .dependency-cruiser.cjs                 | 31 ++++++++++++++++++++++++-
+ ARCHITECTURE.md                         | 19 ++++++++++++++-
+ DECISIONS.md                            | 14 +++++++++++
+ PROJECT_STATE.md                        |  4 +++-
+ apps/client/package.json                |  1 +
+ apps/client/src/config/default-match.ts |  2 +-
+ pnpm-lock.yaml                          |  3 +++
+ 7 files changed, 70 insertions(+), 4 deletions(-)
+
+diff --git a/.dependency-cruiser.cjs b/.dependency-cruiser.cjs
+index da2da12..acabd1d 100644
+--- a/.dependency-cruiser.cjs
++++ b/.dependency-cruiser.cjs
+@@ -37,7 +37,8 @@ module.exports = {
+       comment: "The local match host is browser/render independent.",
+       severity: "error",
+       from: { path: "^apps/client/src/host(?:/|$)" },
+-      to: { path: "^(?:node_modules/)?three(?:/|$)" }
++      // pnpm resolves to node_modules/.pnpm/three@x/node_modules/three/...
++      to: { path: ["node_modules/three/", "node_modules/\\.pnpm/three@"] }
+     },
+     {
+       name: "host-does-not-import-renderer",
+@@ -53,6 +54,20 @@ module.exports = {
+       from: { path: "^apps/client/src/host(?:/|$)" },
+       to: { path: "^packages/cards(?:/|$)" }
+     },
++    {
++      name: "host-does-not-import-config",
++      comment: "Setup data (seed, cards, decks) is injected by the entry point. Only host tests may use the default config.",
++      severity: "error",
++      from: { path: "^apps/client/src/host/", pathNot: "\\.test\\.ts$" },
++      to: { path: "^apps/client/src/config(?:/|$)" }
++    },
++    {
++      name: "renderer-imports-engine-types-only",
++      comment: "The renderer draws PlayerView data. Engine functions run in the host, never in render/ (D-018).",
++      severity: "error",
++      from: { path: "^apps/client/src/render(?:/|$)" },
++      to: { path: "^packages/engine/", dependencyTypesNot: ["type-only"] }
++    },
+     {
+       name: "renderer-does-not-import-host",
+       comment: "Renderer consumes host output through its caller, never host internals.",
+@@ -74,6 +89,20 @@ module.exports = {
+       from: { path: "^packages/engine/src", pathNot: "^packages/engine/src/(setup\\.ts|internal/)" },
+       to: { path: "^packages/engine/src/internal/setup-core\\.ts$" }
+     },
++    {
++      name: "no-unresolvable-imports",
++      comment: "Every import must resolve. An unresolved import slips past every path-based boundary rule.",
++      severity: "error",
++      from: {},
++      to: { couldNotResolve: true }
++    },
++    {
++      name: "no-relative-imports-across-packages",
++      comment: "Use the other package's name (e.g. @x/cards), never a relative path into its source.",
++      severity: "error",
++      from: { path: "^(apps|packages)/([^/]+)/" },
++      to: { path: "^(apps|packages)/", pathNot: "^$1/$2/", dependencyTypes: ["local"] }
++    },
+     {
+       name: "no-circular",
+       severity: "error",
+diff --git a/ARCHITECTURE.md b/ARCHITECTURE.md
+index 21e2f01..43b1fee 100644
+--- a/ARCHITECTURE.md
++++ b/ARCHITECTURE.md
+@@ -447,4 +447,21 @@ Rules:
+ - The renderer never compares an old state with a new state to work out what happened. Events are the only description of change.
+ - A thin local match host (outside `render/`) owns the `GameState`, calls `applyCommand`, and hands the renderer `viewFor` + `enumerateLegalCommands` + `eventsFor`. Local hot-seat play switches `viewerId`.
+ 
+-Enforced by `scripts/check-renderer-boundary.mjs` (part of `pnpm boundaries`): code under `apps/client/src/render/` may import engine **types** only and may not mention `GameState` or keep previous-state copies.
++Enforced as part of `pnpm boundaries`:
++
++- dependency-cruiser (`.dependency-cruiser.cjs`) checks every import: `render/` imports engine **types only** and never `host/`; `host/` never imports `three`, `render/`, `@x/cards` or `config/` (tests excepted for `config/`); no import may be unresolvable; no relative import may reach into another package's source;
++- `scripts/check-renderer-boundary.mjs` checks what imports cannot show: no mention of `GameState` and no previous-state copies in `render/`.
++
++## 22. X2 Local Match Host (D-019)
++
++`apps/client/src/host/createLocalMatchHost(input, initialViewer)`:
++
++- owns the `GameState` privately; its public interface has no state getter;
++- receives all setup data (seed, card definitions, both decks, match id, card-set version) from the caller. The default X2 setup is `apps/client/src/config/default-match.ts` (two copies of each of the 15 supported real cards); the host never creates a seed;
++- `getOutput()` returns `{ viewerId, stateVersion, view, legalCommands, events, eventStartIndex, eventEndIndex }` and has no side effects;
++- `legalCommands` is empty unless the viewer is the active player (who also owns every pending choice); it is cached per `stateVersion`;
++- `pickLegalCommand(stateVersion, index)` is the only way to act. Rejections, in order: `MATCH_RESOLVED`, `NOT_ACTING_VIEWER`, `STALE_VERSION`, `INVALID_INDEX`, `ENGINE_REJECTED`. Rejections change nothing;
++- one append-only event log, with an independent acknowledged position per viewer. `acknowledgeEvents(upToIndex)` moves only the current viewer's position and throws on an invalid index;
++- `setViewer` changes only the projection, never game state, RNG progression or `stateVersion`;
++- `HostOutput` and `HostResult` are JSON-safe;
++- `host/` compiles with no DOM library (`tsconfig.host.json`) and is included in the determinism scan.
+diff --git a/DECISIONS.md b/DECISIONS.md
+index 38846c9..8678645 100644
+--- a/DECISIONS.md
++++ b/DECISIONS.md
+@@ -323,3 +323,17 @@ Decision:
+ - `eventsFor(events, viewerId)` returns the event stream as that player may see it: a card that stays hidden on both ends of a move (e.g. the opponent drawing) keeps its zones and reason but has `instanceId: null`. A card that becomes public keeps its identity.
+ - A whole-match test checks, after every command, that neither player's view nor filtered events contain any opponent-hand or deck instance id.
+ - X2 renderer inputs are exactly `viewFor`, `enumerateLegalCommands` and `eventsFor` (ARCHITECTURE.md §21), enforced by `scripts/check-renderer-boundary.mjs`.
++
++---
++
++## D-019 — X2 Step 1: Local Match Host
++
++Status: **ACTIVE**
++
++Decision:
++
++The X2 client talks to the engine only through the local match host (ARCHITECTURE.md §22): private `GameState`, externally supplied setup, non-consuming output reads, per-viewer event acknowledgement, legal commands only for the active viewer, and actions only as `(stateVersion, index)` picks from the current legal list.
++
++Coverage added: real-card tests for all 15 currently supported cards; a production-valid 30-card real-deck match played entirely through the host, with privacy checks for both viewers after every step, deterministic replay, viewer-switch invariance and a frozen seed that reaches a pending choice.
++
++Boundary enforcement is import-based (dependency-cruiser) and proven by a negative probe that is never committed: an uncommitted host/render probe made the no-DOM host typecheck, eight dependency rules and the determinism scan all fail, and the tree passed again once the probe was deleted.
+diff --git a/PROJECT_STATE.md b/PROJECT_STATE.md
+index a6f512a..90b00be 100644
+--- a/PROJECT_STATE.md
++++ b/PROJECT_STATE.md
+@@ -131,4 +131,6 @@ Do not start Supabase, networking, AI, cosmetics, progression or monetization du
+ 
+ ## Next Concrete Task
+ 
+-**Build the local match host and wire the Three.js greybox renderer to it: the renderer takes `viewFor()`, `enumerateLegalCommands()` and `eventsFor()` only (renderer code lives in `apps/client/src/render/`). Render the six gameplay zones and expose only legal local-player actions.**
++**X2 step 2 — static renderer:** render both players' six zones plus turn, round, score, STA and Arena Collapse information from `HostOutput` / `PlayerView` only, with no animation yet (renderer code lives in `apps/client/src/render/`). Then run the agreed renderer-boundary audit checkpoint.
++
++X2 step 1 (local match host, D-019) is complete.
+diff --git a/apps/client/package.json b/apps/client/package.json
+index 6376f8c..da81364 100644
+--- a/apps/client/package.json
++++ b/apps/client/package.json
+@@ -10,6 +10,7 @@
+     "build": "vite build"
+   },
+   "dependencies": {
++    "@x/cards": "workspace:*",
+     "@x/engine": "workspace:*",
+     "three": "^0.170.0"
+   },
+diff --git a/apps/client/src/config/default-match.ts b/apps/client/src/config/default-match.ts
+index ae2af7f..bed5656 100644
+--- a/apps/client/src/config/default-match.ts
++++ b/apps/client/src/config/default-match.ts
+@@ -1,4 +1,4 @@
+-import { fullSet } from "../../../../packages/cards/src/index.ts";
++import { fullSet } from "@x/cards";
+ import type { MatchSetupInput } from "@x/engine";
+ 
+ export const SUPPORTED_LOCAL_CARD_IDS = [
+diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+index 78f4d1c..4ebb57c 100644
+--- a/pnpm-lock.yaml
++++ b/pnpm-lock.yaml
+@@ -23,6 +23,9 @@ importers:
+ 
+   apps/client:
+     dependencies:
++      '@x/cards':
++        specifier: workspace:*
++        version: link:../../packages/cards
+       '@x/engine':
+         specifier: workspace:*
+         version: link:../../packages/engine
+-- 
+2.43.0
