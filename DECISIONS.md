@@ -323,3 +323,17 @@ Decision:
 - `eventsFor(events, viewerId)` returns the event stream as that player may see it: a card that stays hidden on both ends of a move (e.g. the opponent drawing) keeps its zones and reason but has `instanceId: null`. A card that becomes public keeps its identity.
 - A whole-match test checks, after every command, that neither player's view nor filtered events contain any opponent-hand or deck instance id.
 - X2 renderer inputs are exactly `viewFor`, `enumerateLegalCommands` and `eventsFor` (ARCHITECTURE.md §21), enforced by `scripts/check-renderer-boundary.mjs`.
+
+---
+
+## D-019 — X2 Step 1: Local Match Host
+
+Status: **ACTIVE**
+
+Decision:
+
+The X2 client talks to the engine only through the local match host (ARCHITECTURE.md §22): private `GameState`, externally supplied setup, non-consuming output reads, per-viewer event acknowledgement, legal commands only for the active viewer, and actions only as `(stateVersion, index)` picks from the current legal list.
+
+Coverage added: real-card tests for all 15 currently supported cards; a production-valid 30-card real-deck match played entirely through the host, with privacy checks for both viewers after every step, deterministic replay, viewer-switch invariance and a frozen seed that reaches a pending choice.
+
+Boundary enforcement is import-based (dependency-cruiser) and proven by a negative probe that is never committed: an uncommitted host/render probe made the no-DOM host typecheck, eight dependency rules and the determinism scan all fail, and the tree passed again once the probe was deleted.
