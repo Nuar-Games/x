@@ -2,10 +2,12 @@
 
 ## Current Phase
 
-**X1.1 — Pre-X2 rules fix and client-view boundary**
+**X2 — Local 2D Arena**
 
 X0 — Rulebook / Establishment is **CLOSED**.
-X1 — Headless Game Engine passed its exit gate at `eb2342a`, but a concrete §19 deck-exhaustion regression was found before X2 began. Per the phase rules, X1 is reopened narrowly only for this verified regression and the minimum client-facing view boundary needed to prevent X2 from depending on hidden information.
+X1 — Headless Game Engine is **CLOSED**.
+
+The X1 exit gate passed after all 16 architecture steps were implemented and verified. Do not reopen X1 for optional polish. Reopen only if a real contradiction, regression, or implementation blocker proves that an exit criterion was not actually satisfied.
 
 ## Project Identity
 
@@ -26,28 +28,102 @@ X1 — Headless Game Engine passed its exit gate at `eb2342a`, but a concrete §
 
 ## Rules Version
 
-Current rules version: **0.2.2**.
+Current rules version: **0.2.2** (see `GAME_RULES.md`, D-013 through D-016).
 
 ## Current Implementation State
 
-- X1 steps 1–16 are implemented and the exit gate previously passed.
-- A concrete §19 regression is now the only rules blocker before X2: after an Effect or DEF battle, the engine currently scores whenever either deck is empty, even if that Effect/battle did not cause or encounter the exhaustion.
-- Required X1.1 fix: Effect/battle exhaustion must end the match only when that specific resolution emptied a deck or required a top-deck card that was unavailable. Normal draw exhaustion remains: score only when a player starts a draw with an empty deck.
-- Golden matches must be re-recorded if their terminal states change after the fix.
-- Add `viewFor(state, playerId)` before X2 rendering. The per-player view must hide the opponent's hand identities and both deck orders while preserving public counts/state needed for rendering.
-- X2 client must render from `viewFor(...)` and legal actions from `enumerateLegalCommands()`; it must not read canonical full `GameState` directly for presentation.
-- X2 animations must be driven from ordered engine events (`CARD_MOVED`, `BATTLE_RESOLVED`, `ROUND_ENDED`, `ARENA_COLLAPSED`, etc.), then snap to the authoritative player view after the event queue completes. Do not derive animation semantics by diffing old/new states.
+- X0 establishment is closed.
+- X1 architecture is defined and implemented.
+- Canonical serializable `GameState` is implemented and JSON round-trip tested.
+- Command-driven state mutation contract is implemented.
+- Deterministic resolution and seeded RNG are implemented.
+- Card definitions vs card instances are separated.
+- Repo skeleton exists (D-008): TypeScript monorepo, Vitest, CI, architecture boundary checks, determinism check.
+- Greybox Three.js client boots and renders an empty 2.5D table (D-007).
+- Card data (card-set 0.2.0) lives in `packages/cards/data/`: full 30-card set from CARD DATABASE.xlsx, 10-card engine-proof subset, and per-card effect cases. All validated by tests.
+- Production match setup enforces 30–50 cards, max 2 copies per name, known cards and no deferred cards. A separate test-only helper allows sub-30 fixture decks (D-010, D-012).
+- Turn-state machine and single command pipeline (`packages/engine/src/turn.ts`, handlers in `src/handlers/`): draw, hand limit, VS step, Effect step, ATTACK/PASS, Arena Collapse, turn end. Losing your own VS mid-turn ends the turn. Full matches are playable through commands only.
+- Hand limit: 6 on each player's opening turn, 5 from their second turn; `DISCARD_FOR_HAND_LIMIT` moves chosen cards to Zone Tepi.
+- VS deployment / keep / position change / voluntary replacement are implemented, including round end on voluntary replacement (D-013).
+- Effect Zone / STA capacity, effective stats, slot locks, voluntary Effect removal and forced excess removal are implemented.
+- Zone transitions are centralized; Zone X is absolute and cannot be used as a source.
+- Battle matrix is implemented and reached only through commands.
+- Round end is engine-driven (D-014).
+- Arena Collapse is implemented, including prevented-attack inactivity and empty-hand post-collapse skip (D-015).
+- Effect resolver runs the 10-card proof vocabulary; setup rejects cards whose effects the engine cannot run (D-016). All 10 real proof cards are tested through `applyCommand`.
+- Deck exhaustion / scoring / tie-breaker are implemented.
+- Legal command enumeration is implemented and validates candidates through `applyCommand`.
+- Golden matches use fixed seeds, explicit commands and exact frozen terminal snapshots.
+- X1 exit-gate production proof uses `setupMatch` with legal 30-card decks, plays to resolution through public legal commands only, serializes/restores authoritative state mid-match, and confirms both continuations are identical.
+- No AI implemented yet.
+- No X Supabase backend created yet.
+- No X Vercel project created yet.
+- Existing Mega X Supabase/Vercel resources are not X resources and must not be reused by default.
 
-## X1.1 Acceptance Criteria
+## Established Core Systems
 
-1. Regression test: drawing the last card normally does not end the match until a later draw is impossible.
-2. Playing a deck-neutral Effect while a deck is already empty does not end the match.
-3. A DEF battle that does not require an unavailable top-deck card does not end the match merely because a deck was already empty.
-4. Effect/battle paths still end-and-score when they actually empty a deck or require a missing top-deck card under §19.
-5. Golden matches pass with re-recorded snapshots if necessary.
-6. `viewFor(state, playerId)` hides opponent hand identities and both deck orders deterministically and serializably.
-7. Full `pnpm check` passes with frozen install.
+- 30–50 card decks
+- maximum 2 cards with the same name
+- every card can function as VS
+- VS ATK/DEF positioning
+- start-of-turn VS action is position change OR voluntary replacement, not both
+- Mega X-style STA capacity system
+- Effect Zone occupancy
+- Zone X capture scoring and absolute protection
+- Zone Tepi discard/recovery behavior
+- Arena Collapse after 3 consecutive inactive individual turns
+- explicit ATK-vs-ATK and ATK-vs-DEF battle matrix
+- own-turn Effect play
+- one-shot and continuous Effect behavior
+- explicit-text-first card interpretation
+- no general chain/stack response system
+- anti-solitaire design law
+- deck exhaustion ends match after applicable resolution
+- Zone X score determines winner
+- tie-breaker by shuffled non-Zone-X pool and printed ATK; unbreakable tie = draw
+- dual-use cards (VS or Effect role)
+- only ATK-position VS can attack
+- opening-turn 6-card hand allowance
+- Arena Collapse at end of third inactive turn, counter reset, deploy-only continuation
+
+## X0 Closure Record
+
+X0 exit criteria are satisfied.
+
+## X1 Closure Record
+
+All 16 implementation steps in `ARCHITECTURE.md` §18 are complete.
+
+The X1 exit gate in `PHASES_AND_WORKFLOW.md` is satisfied:
+- a production-valid legal match can run from setup to final winner entirely through the engine;
+- core rules required by the locked X1 proof scope are represented and the 10 real proof cards execute through the command pipeline;
+- illegal commands are rejected deterministically;
+- authoritative state is JSON serializable and can be restored mid-match;
+- same seed + same commands is deterministic;
+- all engine tests and golden matches pass;
+- CI passes frozen install, typecheck, tests, architecture boundaries, determinism and build;
+- no uncaught engine exception remains in the passing suite.
+
+X1 is closed. Do not expand the headless engine for optional work before X2. Reopen only for a demonstrated regression or blocker.
+
+## Branch Workflow
+
+All substantial work happens on branches and merges into `main` (constitution Rule 18).
+
+## Current Required Work — X2
+
+Per `PHASES_AND_WORKFLOW.md`, X2 is the Local 2D Arena using the existing greybox 2.5D Three.js renderer.
+
+Required work:
+1. render authoritative engine state;
+2. provide hand, deck, VS Zone, Effect Zone, Zone X and Zone Tepi views;
+3. expose only legal actions supplied by the engine;
+4. implement ATK/DEF position controls;
+5. provide clear turn, round, Arena Collapse, STA and scoring feedback;
+6. keep animation/audio non-authoritative and downstream of committed engine transitions.
+
+Do not start Supabase, networking, AI, cosmetics, progression or monetization during X2.
 
 ## Next Concrete Task
 
-**Build and merge the X1.1 PR containing the §19 deck-exhaustion regression fix, any required golden re-recording, and `viewFor(state, playerId)`. Then return to X2 and wire the Three.js client to player views + legal commands, with animation driven by the engine event stream.**
+**Wire the existing Three.js greybox client to the X1 engine state and `enumerateLegalCommands()`. Render the six gameplay zones and expose only legal local-player actions; keep all presentation state non-authoritative.**
