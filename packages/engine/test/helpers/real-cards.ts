@@ -10,6 +10,10 @@ import { setupTestMatch } from "./setup-test-match.ts";
 export { engineProofSet, fullSet };
 
 export const PROOF_IDS = engineProofSet.cards.map((card) => card.id);
+export const SUPPORTED_REAL_IDS = [
+  "X001", "X002", "X004", "X005", "X006", "X008", "X011", "X012",
+  "X013", "X016", "X019", "X020", "X021", "X025", "X030"
+] as const;
 
 /** Both players get two copies of every proof card (20-card test decks, D-010). */
 export function proofMatch(seed = 1): GameState {
@@ -19,6 +23,23 @@ export function proofMatch(seed = 1): GameState {
     seed,
     cardSetVersion: engineProofSet.cardSetVersion,
     cardDefinitions: engineProofSet.cards,
+    player1Deck: deck,
+    player2Deck: deck
+  });
+  return withActive(state, "P1");
+}
+
+/** Both players get two copies of every currently supported real card. */
+export function supportedMatch(seed = 1): GameState {
+  const deck = SUPPORTED_REAL_IDS.flatMap((id) => [id, id]);
+  const supportedDefinitions = fullSet.cards.filter((card) =>
+    SUPPORTED_REAL_IDS.includes(card.id as (typeof SUPPORTED_REAL_IDS)[number])
+  );
+  const state = setupTestMatch({
+    matchId: `supported-${seed}`,
+    seed,
+    cardSetVersion: fullSet.cardSetVersion,
+    cardDefinitions: supportedDefinitions,
     player1Deck: deck,
     player2Deck: deck
   });
