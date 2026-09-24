@@ -13,15 +13,18 @@ The host is the only client-side owner of authoritative `GameState`. Consumers n
 The host must:
 
 - own the authoritative `GameState`;
-- create matches through `setupMatch`, complete automatic setup/turn transitions through `advance`, and mutate matches only through `applyCommand`;
-- expose per-viewer output as `{ view, legalCommands, events }`;
+- receive the match seed, card definitions and both deck lists from outside the host, create matches through `setupMatch`, complete automatic setup/turn transitions through `advance`, and mutate matches only through `applyCommand`;
+- never generate a seed from time, `Math.random`, or any other uncontrolled source;
+- expose per-viewer output as `{ stateVersion, view, legalCommands, events }`;
 - derive `view` with `viewFor(state, viewerId)`;
 - derive viewer-visible events with `eventsFor(events, viewerId)`;
 - expose legal commands only to the player currently being asked to act;
 - accept a command only by selecting an entry from the host's current legal-command list, never by accepting a newly constructed `Command` object;
-- retain one authoritative event log with an independent read cursor for P1 and P2;
+- retain one authoritative event log with an independent acknowledged-event cursor for P1 and P2;
+- make output reads side-effect free: reading events never acknowledges or consumes them;
 - switch viewer identity without changing authoritative game state;
-- remain usable and testable in Node with no DOM, Three.js, renderer, or browser dependency.
+- remain usable and testable in Node with no DOM, Three.js, renderer, browser, clock, or uncontrolled-randomness dependency;
+- expose only plain JSON-round-trippable data so the same host/result contract can later cross an X5 network boundary unchanged.
 
 ## Public Host Interface
 
@@ -33,18 +36,34 @@ Conceptually:
 interface LocalMatchHost {
   getOutput(): HostOutput;
   setViewer(viewerId: PlayerId): HostOutput;
-  pickLegalCommand(index: number): HostResult;
+  pickLegalCommand(stateVersion: number, index: number): HostResult;
+  acknowledgeEvents(upToIndex: number): HostResult;
 }
 
 interface HostOutput {
   viewerId: PlayerId;
+  stateVersion: number;
   view: PlayerView;
   legalCommands: readonly Command[];
   events: readonly ViewEvent[];
+  eventStartIndex: number;
+  eventEndIndex: number;
 }
 ```
 
+`HostOutput` and `HostResult` are plain data and must survive a JSON round trip without hidden references, methods, browser objects, or class instances.
+
 Exact names may follow existing repository conventions, but the information boundary is fixed.
+
+### State version
+
+The host owns a monotonically increasing `stateVersion`:
+
+- it starts at `0` after initial setup/`advance` completes;
+- it increments by exactly `1` after every accepted command;
+- viewer switches, output reads, event acknowledgement, and rejected command picks do not change it.
+
+`pickLegalCommand(stateVersion, index)` must compare the caller's version to the host's current version before resolving the index. A version mismatch returns `STALE_VERSION` and must not call `applyCommand`.
 
 ### Legal-command visibility
 
@@ -53,35 +72,59 @@ Exact names may follow existing repository conventions, but the information boun
 - if `viewerId === state.activePlayerId`, `legalCommands` is the current legal list;
 - otherwise `legalCommands` is `[]`.
 
-A non-active viewer never receives the active player's command list.
+The engine currently creates pending choices only for the active player, so the player being asked to act remains `activePlayerId` during pending choice resolution. Host tests must assert this; if a future card creates a non-active-player choice, the host contract must be deliberately revised rather than silently leaking or misrouting commands.
+
+After the match resolves, both viewers receive `legalCommands: []`.
 
 ### Command submission
 
 The host never accepts arbitrary command objects from the client.
 
-`pickLegalCommand(index)` resolves the index against the host's current legal list for the current viewer. Invalid indexes, stale selections, or selections made while the viewer is not the acting player are rejected by the host before `applyCommand` is called.
+`pickLegalCommand(stateVersion, index)` resolves the index against the host's current legal list for the current viewer only after the version check passes. Invalid indexes, stale selections, selections made while the viewer is not the acting player, or picks after match resolution are rejected by the host before `applyCommand` is called.
 
 The renderer/input layer therefore selects from engine-authorized commands rather than constructing commands.
 
-After an accepted command, the host appends the emitted `EngineEvent[]` to its event log and refreshes output from the new engine state.
+After an accepted command, the host appends the emitted `EngineEvent[]` to its event log, increments `stateVersion`, and refreshes output from the new engine state.
+
+Host-level rejections use fixed codes:
+
+- `INVALID_INDEX`
+- `STALE_VERSION`
+- `NOT_ACTING_VIEWER`
+- `MATCH_RESOLVED`
+- `ENGINE_REJECTED`
+
+Tests assert exact rejection codes.
 
 ## Event Delivery and Hot-Seat Cursors
 
-The host maintains one append-only in-memory engine event log for the current local match and an independent read cursor for each viewer:
+The host maintains one append-only in-memory engine event log for the current local match and an independent acknowledged-event cursor for each viewer:
 
 ```text
-P1 -> event index last delivered to P1
-P2 -> event index last delivered to P2
+P1 -> authoritative event index acknowledged by P1
+P2 -> authoritative event index acknowledged by P2
 ```
 
-When output is requested for a viewer:
+The events emitted by the first `advance()` immediately after `setupMatch` — including P1's opening-turn draw — are appended to this same event log before the first output is returned, so both viewers can receive them through their own cursors.
 
-1. take events after that viewer's cursor;
-2. filter them through `eventsFor(events, viewerId)`;
-3. return the resulting ordered `ViewEvent[]`;
-4. advance only that viewer's cursor to the end of the authoritative event log.
+### Reading events is side-effect free
 
-Switching from P1 to P2 therefore allows P2 to receive events that occurred while P1 was acting, without exposing events already consumed by P2 or advancing P1's cursor.
+`getOutput()` only reads. For the current viewer it:
+
+1. takes authoritative events after that viewer's acknowledged cursor;
+2. filters them through `eventsFor(events, viewerId)`;
+3. returns the resulting ordered `ViewEvent[]` plus the authoritative event-index range represented by that output;
+4. does **not** move either viewer's cursor.
+
+Calling `getOutput()` repeatedly with no acknowledgement returns the same unseen event sequence.
+
+### Acknowledging events is explicit
+
+`acknowledgeEvents(upToIndex)` advances only the current viewer's acknowledged cursor, and only forward to a valid index at or before the current end of the authoritative log. The future X2 animation queue calls this once animations through that index have completed.
+
+Switching from P1 to P2 therefore allows P2 to receive events that occurred while P1 was acting, without exposing events already acknowledged by P2 or advancing P1's cursor.
+
+After match resolution, both viewers' unseen events still include `MATCH_ENDED` until each viewer explicitly acknowledges through that event.
 
 The event log is not renderer state and is not used to infer game truth. `GameState` remains authoritative.
 
@@ -94,10 +137,28 @@ It must not:
 - call `applyCommand`;
 - call gameplay RNG;
 - advance the turn;
+- alter `stateVersion`;
+- acknowledge events;
 - alter zones, modifiers, pending choices, score, or event history;
 - expose a `GameState` reference.
 
 A test must compare authoritative behavior before and after viewer switches to prove state is unchanged.
+
+## Deterministic Match Setup
+
+The host receives all deterministic setup inputs from the application entry/config layer:
+
+- `seed`;
+- `cardDefinitions`;
+- `player1Deck`;
+- `player2Deck`;
+- match/card-set identifiers required by `setupMatch`.
+
+The host never chooses or derives a seed itself.
+
+The default local X2 deck — two copies of each of the 15 currently engine-supported real cards — lives in a config module outside `host/` and is passed into the host. This preserves the host rule that it imports only the engine public API and host-local modules.
+
+`scripts/check-determinism.mjs` must scan `apps/client/src/host/` in addition to engine sources so direct clock/random calls in host code fail CI.
 
 ## Host Purity and Dependency Enforcement
 
@@ -152,6 +213,8 @@ This PR adds real-card engine tests for those five. These are regression/coverag
 
 The local-host integration test uses a legal 30-card deck consisting of two copies of each of the 15 currently supported real cards.
 
+The reusable default-deck definition lives outside `host/` and is supplied to the host by the application/config layer.
+
 This satisfies production deck construction without synthetic card definitions and proves the X2 host can drive a real-card match through the production setup path.
 
 ## Host Test Matrix
@@ -169,11 +232,13 @@ After every host step, inspect both viewers' outputs and confirm:
 
 Run a complete match from production-valid 30-card real decks through the host until `status === "RESOLVED"`.
 
-Every action is selected from the host's currently exposed `legalCommands` list by index. Tests must not construct and submit arbitrary `Command` objects to the host.
+Every action is selected from the host's currently exposed `legalCommands` list by `(stateVersion, index)`. Tests must not construct and submit arbitrary `Command` objects to the host.
+
+After resolution, both viewers must have empty legal-command lists and both must still be able to read an unacknowledged `MATCH_ENDED` event.
 
 ### Deterministic host replay
 
-Given the same seed and the same sequence of legal-command picks, two host runs must produce the same terminal result and equivalent viewer-visible outputs.
+Given the same externally supplied seed and the same sequence of `(stateVersion, legal-command index)` picks, two host runs must produce the same terminal result and equivalent viewer-visible outputs.
 
 ### Viewer-switch purity
 
@@ -181,11 +246,27 @@ Switching the current viewer repeatedly must not alter authoritative game progre
 
 ### Event cursors
 
-Verify P1 and P2 consume events independently. In particular, after P1 acts and the viewer changes to P2, P2 must receive the events that occurred since P2 last consumed output, filtered for P2.
+Verify P1 and P2 acknowledge events independently. In particular:
+
+- repeated `getOutput()` calls before acknowledgement return the same events;
+- acknowledging for one viewer changes only that viewer's unread range;
+- after P1 acts and the viewer changes to P2, P2 receives the events that occurred since P2 last acknowledged, filtered for P2.
+
+### Stale-list rejection
+
+Capture a `HostOutput`, accept another command that increments the host `stateVersion`, then attempt to submit a pick using the old output's version. The host must return `STALE_VERSION`, leave state/event history unchanged, and never reinterpret the old index against the new command list.
+
+### Pending-choice acting player
+
+During a real pending Effect choice, assert that only `activePlayerId` receives legal choice commands and the non-active viewer receives `[]`.
 
 ### Rejection before engine
 
-Verify invalid/stale indexes and attempts by a non-active viewer are rejected by the host without reaching an engine mutation.
+Verify exact host-level rejection codes for invalid indexes, stale versions, non-active viewers and resolved matches. These paths must reject before an engine mutation. If a current-list engine pick unexpectedly rejects, return `ENGINE_REJECTED` with no host-invented substitute action.
+
+### Plain-data transport shape
+
+JSON round-trip `HostOutput` and every `HostResult` variant and assert equality.
 
 ## Files / Areas Expected to Change
 
@@ -193,7 +274,9 @@ Primary implementation:
 
 - `apps/client/src/host/` — host implementation and host-local types;
 - dedicated host tsconfig under the client package;
+- config module outside `host/` for the default supported real-card deck and deterministic match input construction;
 - client package scripts/tsconfig references as needed for host typechecking;
+- `scripts/check-determinism.mjs` — include `apps/client/src/host/`;
 - boundary-check tooling/configuration;
 - host tests;
 - engine real-card tests for X011, X012, X016, X020 and X025;
@@ -206,14 +289,20 @@ No `apps/client/src/render/` product implementation is part of this PR.
 For the active viewer:
 
 ```text
-GameState (host-private)
-  ├─ viewFor(state, viewerId) ───────────> PlayerView
-  ├─ enumerateLegalCommands(state) ──────> legalCommands (only if viewer is active)
-  └─ event log[cursor..] -> eventsFor() ─> ViewEvent[]
+externally supplied deterministic setup
+  └─ seed + card definitions + both decks
+       └─ local match host
+            └─ GameState (host-private)
+                 ├─ viewFor(state, viewerId) ───────────> PlayerView
+                 ├─ enumerateLegalCommands(state) ──────> legalCommands (only if viewer is active)
+                 └─ event log[cursor..] -> eventsFor() ─> ViewEvent[]
 
 renderer/input consumer
-  └─ pick command index ─────────────────> host
-                                             └─ applyCommand(selected legal command)
+  └─ (stateVersion, legal-command index) ───────────────> host
+                                                           └─ applyCommand(selected legal command)
+
+event animation consumer
+  └─ acknowledgeEvents(upToIndex) ─────────────────────> host advances only current viewer cursor
 ```
 
 For the non-active viewer, the same projection/event flow applies, but `legalCommands` is empty.
@@ -222,14 +311,13 @@ For the non-active viewer, the same projection/event flow applies, but `legalCom
 
 Host-level rejection is expected for:
 
-- invalid command index;
-- stale command index after state changed;
-- command selection while viewer is not the active player;
-- command selection after match resolution.
+- invalid command index → `INVALID_INDEX`;
+- stale command list/version → `STALE_VERSION`;
+- command selection while viewer is not the active player → `NOT_ACTING_VIEWER`;
+- command selection after match resolution → `MATCH_RESOLVED`;
+- a supposedly legal current command rejected by the engine → `ENGINE_REJECTED`.
 
-These rejections do not mutate game state or append gameplay events.
-
-Engine command rejection should be unreachable when selecting from a freshly generated legal list. If it occurs, the host returns a deterministic failure rather than inventing a substitute command or mutating state.
+These rejections do not mutate game state, increment `stateVersion`, acknowledge events, or append gameplay events.
 
 ## Out of Scope
 
@@ -251,14 +339,22 @@ Those remain later X2/X3+ work according to the agreed sequence.
 The PR is complete only when:
 
 1. the host owns authoritative `GameState` and exposes no state getter;
-2. output is `{ view, legalCommands, events }` for the selected viewer;
-3. non-active viewers receive zero legal commands;
-4. commands enter the host only as picks from the current legal list;
-5. P1/P2 event cursors independently preserve unseen events across viewer switches;
-6. host code typechecks with no DOM library and boundary checks prevent host/render/Three coupling;
-7. the five previously untested supported real cards execute against their real effect cases;
-8. a production-valid 30-card real-card match resolves entirely through the host;
-9. privacy checks run after every host step for both viewers;
-10. same seed + same picks is deterministic;
-11. viewer switching does not affect game truth;
-12. the full repository frozen-install `pnpm check` passes.
+2. output is `{ stateVersion, view, legalCommands, events }` plus event-index metadata for the selected viewer;
+3. `getOutput()` is side-effect free and event acknowledgement is explicit;
+4. non-active viewers receive zero legal commands, including during pending choices;
+5. commands enter the host only as `(stateVersion, index)` picks from the current legal list;
+6. stale picks reject with `STALE_VERSION` before index reinterpretation;
+7. accepted commands increment `stateVersion` exactly once; reads/switches/acks/rejections do not;
+8. P1/P2 event cursors independently preserve unacknowledged events across viewer switches;
+9. opening-advance events are in the shared log, and resolved matches still expose `MATCH_ENDED` until acknowledged;
+10. host setup is entirely externally seeded/configured; the default 30-card supported deck lives outside `host/`;
+11. host code typechecks with no DOM library and boundary checks prevent host/render/Three coupling;
+12. determinism tooling scans `apps/client/src/host/`;
+13. the five previously untested supported real cards execute against their real effect cases;
+14. a production-valid 30-card real-card match resolves entirely through the host;
+15. privacy checks run after every host step for both viewers;
+16. same seed + same picks is deterministic;
+17. viewer switching does not affect game truth;
+18. `HostOutput` and `HostResult` are JSON-round-trippable plain data;
+19. host rejection codes are stable and tested exactly;
+20. the full repository frozen-install `pnpm check` passes.
