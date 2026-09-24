@@ -129,6 +129,8 @@ export interface PendingResolutionState {
   readonly affectedPlayerId: PlayerId;
   readonly remainingSteps: readonly EffectSpec[];
   readonly inheritedDuration?: ModifierDuration;
+  /** GAME_RULES.md §19: this Effect already emptied a deck or found a required deck card missing. */
+  readonly deckExhaustedByEffect: boolean;
 }
 
 export interface GameState {
