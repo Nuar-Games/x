@@ -427,3 +427,24 @@ X1 remains open until all of these are true:
 - no uncaught engine exception remains in the test suite.
 
 When this gate passes, X1 closes. Optional engine polish must not prevent transition to X2.
+
+X1.1 (D-017, D-018) corrected the §19 end-of-match timing and added per-player views before X2 began.
+
+## 21. X2 Renderer Boundary (D-018)
+
+The 2.5D client has three inputs and nothing else:
+
+| Input | Source | Used for |
+|---|---|---|
+| What to draw | `viewFor(state, viewerId)` → `PlayerView` | the six zones, stats, turn/round/Arena Collapse/score/status |
+| What the player may do | `enumerateLegalCommands(state)` | the only clickable actions; the chosen command goes to `applyCommand` |
+| What to animate | `eventsFor(events, viewerId)` → ordered `ViewEvent[]` | the animation queue |
+
+Rules:
+
+- The renderer never receives `GameState`. The opponent's hand and both deck orders do not exist in its input, so no UI can depend on them. X5 (online) then changes the transport, not the renderer.
+- Animations play the event queue in order. When the queue finishes, the renderer snaps to the latest `PlayerView`.
+- The renderer never compares an old state with a new state to work out what happened. Events are the only description of change.
+- A thin local match host (outside `render/`) owns the `GameState`, calls `applyCommand`, and hands the renderer `viewFor` + `enumerateLegalCommands` + `eventsFor`. Local hot-seat play switches `viewerId`.
+
+Enforced by `scripts/check-renderer-boundary.mjs` (part of `pnpm boundaries`): code under `apps/client/src/render/` may import engine **types** only and may not mention `GameState` or keep previous-state copies.
