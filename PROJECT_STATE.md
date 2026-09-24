@@ -2,18 +2,12 @@
 
 ## Current Phase
 
-**X1 — Headless Game Engine**
+**X2 — Local 2D Arena**
 
 X0 — Rulebook / Establishment is **CLOSED**.
+X1 — Headless Game Engine is **CLOSED**.
 
-The establishment gate was closed after:
-- project constitution existed;
-- authoritative game rules were consolidated and verified against the establishment decisions;
-- working protocol existed;
-- phases/workflow with hard exit criteria existed;
-- no known contradiction remained that blocks implementation of the base engine.
-
-Do not reopen X0 for optional polish or hypothetical edge cases. Reopen only if a real contradiction, regression, or implementation blocker proves an establishment rule is insufficient or inconsistent.
+Closed phases are not reopened for optional polish or hypothetical edge cases. Reopen only if a real contradiction, regression, or implementation blocker proves an exit criterion was not actually satisfied.
 
 ## Project Identity
 
@@ -39,33 +33,21 @@ Current rules version: **0.2.2** (see `GAME_RULES.md`, D-013 through D-016).
 ## Current Implementation State
 
 - X0 establishment is closed.
-- X1 architecture is defined.
-- Canonical serializable `GameState` requirements are defined.
-- Command-driven state mutation contract is defined.
-- Deterministic resolution and seeded RNG requirements are defined.
-- Card definitions vs card instances are separated architecturally.
-- Test layers and golden-match requirements are defined.
-- Repo skeleton exists (D-008): TypeScript monorepo, Vitest, CI, architecture boundary checks, determinism check.
-- Greybox Three.js client boots and renders an empty 2.5D table (D-007).
-- Card data (card-set 0.2.0) lives in `packages/cards/data/`: full 30-card set from CARD DATABASE.xlsx, 10-card engine-proof subset, and per-card effect cases. All validated by tests.
-- Canonical serializable game-state types are implemented in `packages/engine/src/state.ts`.
-- Deterministic seeded RNG is implemented in `packages/engine/src/rng.ts` with deterministic shuffle and bounded integer generation. It is pure (D-012).
-- Production match setup enforces 30–50 cards, max 2 copies per name, known cards and no deferred cards. A separate test-only helper allows sub-30 fixture decks (D-010, D-012).
-- Turn-state machine and single command pipeline (`packages/engine/src/turn.ts`, handlers in `src/handlers/`): draw, hand limit, VS step, Effect step, ATTACK/PASS, Arena Collapse, turn end. Losing your own VS mid-turn ends the turn. A full match can be played through commands only (see `test/flow.test.ts`).
-- Hand limit: 6 on each player's opening turn, 5 from their second turn; `DISCARD_FOR_HAND_LIMIT` command moves chosen cards to Zone Tepi.
-- VS step is implemented: required deployment from hand in ATK/DEF, explicit keep-as-is, one start-of-turn ATK/DEF position change, and voluntary replacement. Voluntary replacement captures the old VS into the opponent's Zone X before the new VS is deployed.
-- Normal VS choice is consumed by advancing immediately to `EFFECT_ACTIONS`, which also enforces the newly deployed/replacement position lock for the rest of that turn.
-- Commands return accepted (new state + events) or rejected (unchanged state + stable code).
-- Effect Zone / STA capacity is implemented: immutable card-definition snapshots in match state, effective-stat calculation in locked order, normal 5-slot cap, STA-derived Effect capacity, voluntary Effect removal to opponent Zone X, slot-lock capacity, and deterministic forced excess removal to Zone Tepi.
-- Zone transitions are centralized in `packages/engine/src/zones.ts`. Normal gameplay movement routes through the engine-owned primitive, source-container membership is verified, leaving Effect cleans source-bound state, and Zone X cannot be used as a source under any transition.
-- Battle matrix resolution is implemented in `packages/engine/src/battle.ts` and reached through the ATTACK command.
-- Effect resolver runs the proof-set vocabulary. Setup rejects cards whose effects the engine cannot run (D-016). All 10 real proof cards are tested through `applyCommand` (`test/proof-cards.test.ts`).
-- Arena Collapse is implemented; prevented attacks do not count as attacks and an empty hand skips post-collapse deployment (D-015).
-- Round end is engine-driven (D-014): any VS leaving the VS Zone ends the round inside `zones.ts`. Voluntary replacement ends the round (D-013).
-- Effect resolver primitives are implemented for the locked 10-card proof vocabulary: DRAW, SET_STAT, MODIFY_STAT, DESTROY_ALL opponent Effects, SET_POSITION, BLOCK_ATTACKS, SEQUENCE and DISCARD_CHOSEN. Resolution is command-driven, explicit choices are serialized through `pendingResolution` / `RESOLVE_EFFECT_CHOICE`, STA=0 destruction and STA-excess consequences happen immediately, and attack restrictions are consumed by the next legal attack attempt.
-- Deck exhaustion / scoring / tie-breaker are implemented: normal-draw, Effect-draw and battle top-deck exhaustion resolve at the established boundary; Zone X is scored; tied scores use deterministic shuffled non-Zone-X pools and printed/base ATK; an unbreakable tie is a draw.
-- Legal command enumeration is implemented in `packages/engine/src/legal-commands.ts`. It returns every concrete command currently accepted by the engine, including exact hand-limit and pending-Effect choice combinations, and validates candidates through `applyCommand` so legality remains single-source.
-- Golden matches are implemented in `packages/engine/test/golden-matches.test.ts`: fixed test-only decks, fixed seeds and explicit command sequences are frozen against exact terminal snapshots. One fixture ends on a Zone X lead after combat; one crosses Arena Collapse and ends in an unbreakable draw.
+- X1 headless engine is closed after passing its exit gate.
+- Canonical serializable `GameState` is implemented.
+- Command-driven state mutation and deterministic seeded resolution are implemented.
+- Card definitions and mutable card instances are separated.
+- Repo tooling exists: TypeScript monorepo, Vitest, frozen-lockfile CI, architecture boundary checks and determinism check.
+- Greybox Three.js client boots and renders an empty 2.5D table (D-007); this is the starting surface for X2.
+- Card data (card-set 0.2.0) lives in `packages/cards/data/`: full 30-card set, 10-card engine-proof subset and per-card effect cases.
+- Production setup enforces 30–50 cards, max 2 copies per name, known cards and no deferred/unsupported cards. D-010 short decks remain test-only.
+- Turn flow, opening hand rule, hand cap, VS deployment/keep/change/replacement, Effect play/removal, STA capacity, battle, round end, Arena Collapse, deck exhaustion, scoring and tie-breaker are implemented.
+- Zone transitions are centralized and Zone X is absolute.
+- Effect resolver runs the locked 10-card engine-proof vocabulary; unsupported card effects are rejected at setup rather than silently ignored (D-016).
+- All 10 real proof cards are executed through `applyCommand` tests.
+- Legal command enumeration is implemented and validates candidates through `applyCommand` so legality remains single-source.
+- Golden matches are frozen against exact terminal snapshots.
+- A production-valid 30-card exit-gate match runs from `setupMatch` to a resolved winner using public legal commands only, survives JSON serialize/restore mid-match, and produces an identical continuation after restore.
 - No AI implemented yet.
 - No X Supabase backend created yet.
 - No X Vercel project created yet.
@@ -77,7 +59,7 @@ Current rules version: **0.2.2** (see `GAME_RULES.md`, D-013 through D-016).
 - maximum 2 cards with the same name
 - every card can function as VS
 - VS ATK/DEF positioning
-- start-of-turn VS action is position change OR voluntary replacement, not both
+- start-of-turn VS action is keep OR position change OR voluntary replacement
 - Mega X-style STA capacity system
 - Effect Zone occupancy
 - Zone X capture scoring and absolute protection
@@ -92,22 +74,17 @@ Current rules version: **0.2.2** (see `GAME_RULES.md`, D-013 through D-016).
 - deck exhaustion ends match after applicable resolution
 - Zone X score determines winner
 - tie-breaker by shuffled non-Zone-X pool and printed ATK; unbreakable tie = draw
-- dual-use cards (VS or Effect role)
 - only ATK-position VS can attack
 - opening-turn 6-card hand allowance
 - Arena Collapse at end of third inactive turn, counter reset, deploy-only continuation
 
 ## X0 Closure Record
 
-X0 exit criteria are satisfied.
-
-Final rule verification found one wording mismatch in the previous `GAME_RULES.md`: start-of-turn VS replacement and position change were listed as separate actions. This was corrected to the established rule: choose at most one — change position OR voluntarily replace the current VS.
-
-No other known contradiction currently blocks implementation of the base headless engine.
+X0 exit criteria are satisfied. No known contradiction prevents implementation of the base engine.
 
 ## X1 Architecture Record
 
-`ARCHITECTURE.md` is now created and defines:
+`ARCHITECTURE.md` defines:
 - one serializable authoritative match state;
 - engine-owned zone transitions;
 - command validation instead of direct mutation;
@@ -119,25 +96,26 @@ No other known contradiction currently blocks implementation of the base headles
 - Zone X invariants;
 - battle/effect resolver boundaries;
 - test architecture and golden matches;
-- implementation order for X1.
+- the 16-step X1 implementation order.
 
-`DECISIONS.md` records that the authoritative early-phase order is X0 Rules -> X1 Headless Engine -> X2 Local 2D Arena. This resolves the conflicting early summary line in the constitution in favor of Rule 2, Rule 25, the Core Development Law, and the phase workflow.
+`DECISIONS.md` records that the authoritative early-phase order is X0 Rules -> X1 Headless Engine -> X2 Local 2D Arena.
 
-## Pre-X1 Audit Record
+## X1 Exit-Gate Audit Record
 
-The pre-X1 audit found six rules gaps and several repo issues. All are resolved:
-- rules gaps resolved in `GAME_RULES.md` 0.1.0 (D-005);
-- stale X0 transition text removed from `PHASES_AND_WORKFLOW.md`;
-- constitution development order corrected (D-006);
-- `BACKLOG.md`, `README.md`, `.gitignore` added.
+The X1 exit gate in `PHASES_AND_WORKFLOW.md` and `ARCHITECTURE.md` §20 was audited after all 16 implementation steps.
 
-## Branch Workflow
+Evidence:
+- **setup to winner:** golden matches resolve through engine commands; `test/x1-exit-gate.test.ts` additionally runs a production-valid 30-card match through `setupMatch`, legal-command enumeration and `applyCommand` only;
+- **core rules represented:** deck construction, setup, hand limits, VS rules, STA/Effect Zone, Zone X/Zone Tepi transitions, battle, round end, Arena Collapse, effect-resolution primitives, deck exhaustion, scoring and tie-breaker all have implemented engine paths and regression tests;
+- **illegal commands reject deterministically:** command handlers return stable rejection codes and legal-command enumeration is checked against the same `applyCommand` path;
+- **serializable authoritative state:** canonical state round-trips through JSON, and the production exit-gate match resumes from serialized state;
+- **determinism:** same seed + same commands yields the same state; CI determinism check and golden snapshots pass;
+- **tests/golden matches:** full frozen-lockfile CI passes typecheck, engine/card tests, architecture boundaries, determinism and build;
+- **uncaught exceptions:** no uncaught engine exception remains in the passing test suite.
 
-All X1 work happens on branches and merges into `main` (constitution Rule 18).
+No concrete blocker was found that requires X1 to remain open. Per `PHASES_AND_WORKFLOW.md`, X1 is closed and optional engine expansion must not block X2.
 
-## Current Required Work — X1
-
-The implementation order in `ARCHITECTURE.md` §18 is complete:
+## X1 Implementation Order — Complete
 
 1. ~~types / serializable state model~~ — done;
 2. ~~card definition and instance model~~ — done;
@@ -156,8 +134,10 @@ The implementation order in `ARCHITECTURE.md` §18 is complete:
 15. ~~legal command enumeration~~ — done;
 16. ~~golden match fixtures~~ — done.
 
-Do not proceed to X2 until all X1 exit criteria in `PHASES_AND_WORKFLOW.md` pass.
+## X2 Scope
+
+Per D-007 and `PHASES_AND_WORKFLOW.md`, X2 is the local 2.5D Three.js arena. It must consume authoritative engine state/events and expose only legal actions supplied by the engine. UI must never own or mutate game truth.
 
 ## Next Concrete Task
 
-**Run the X1 exit-gate audit against `GAME_RULES.md`, `ARCHITECTURE.md` §20 and `PHASES_AND_WORKFLOW.md`. Fix only concrete blockers found by that audit; if the gate passes, close X1 and move to X2.**
+**Begin X2 by wiring the existing greybox Three.js client to the engine for a local two-player match: render authoritative zones/state and expose the engine's enumerated legal commands without adding backend, networking, AI or presentation polish.**
