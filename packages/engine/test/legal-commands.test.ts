@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { advance, applyCommand, enumerateLegalCommands, type Command, type GameState } from "../src/index.ts";
 import { testInput } from "./fixtures.ts";
-import { setupTestMatch, withPlayer, withState } from "./helpers/setup-test-match.ts";
+import { setupTestMatch, withState } from "./helpers/setup-test-match.ts";
 
 function commandKey(command: Command): string {
   return JSON.stringify(command);
