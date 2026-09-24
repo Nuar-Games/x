@@ -1,7 +1,7 @@
 import type { EngineEvent } from "./commands.ts";
 import { effectiveStat, removeExcessEffects, requiredExcessEffectCount } from "./effects.ts";
 import { opponentOf } from "./internal/turn-helpers.ts";
-import { scoreIfDeckExhausted } from "./scoring.ts";
+import { scoreAndResolveMatch } from "./scoring.ts";
 import type {
   CardInstanceId,
   EffectSpec,
@@ -46,8 +46,18 @@ function normalizeSteps(spec: EffectSpec, inheritedDuration?: ModifierDuration):
   return [spec];
 }
 
+/**
+ * GAME_RULES.md §19: tracks whether THIS Effect emptied a deck or needed a
+ * deck card that was not there. An already-empty deck alone never counts.
+ * Carried through pending choices so a paused Effect remembers it.
+ */
+interface EffectContext {
+  deckExhausted: boolean;
+}
+
 function pauseForChoice(
   state: GameState,
+  ctx: EffectContext,
   sourceInstanceId: CardInstanceId,
   actingPlayerId: PlayerId,
   choiceKind: "DISCARD_OWN_HAND" | "REMOVE_EXCESS_EFFECTS",
@@ -66,7 +76,8 @@ function pauseForChoice(
       choiceKind,
       choiceCount,
       affectedPlayerId,
-      remainingSteps
+      remainingSteps,
+      deckExhaustedByEffect: ctx.deckExhausted
     }
   };
 }
@@ -97,6 +108,7 @@ function destroyVsAtZeroSta(state: GameState, targetInstanceId: CardInstanceId, 
  */
 function checkCapacityAfterEffect(
   state: GameState,
+  ctx: EffectContext,
   sourceInstanceId: CardInstanceId,
   actingPlayerId: PlayerId,
   events: EngineEvent[]
@@ -104,7 +116,7 @@ function checkCapacityAfterEffect(
   for (const playerId of [actingPlayerId, opponentOf(actingPlayerId)]) {
     const excess = requiredExcessEffectCount(state, playerId);
     if (excess > 0) {
-      return pauseForChoice(state, sourceInstanceId, actingPlayerId, "REMOVE_EXCESS_EFFECTS", excess, playerId, [], events);
+      return pauseForChoice(state, ctx, sourceInstanceId, actingPlayerId, "REMOVE_EXCESS_EFFECTS", excess, playerId, [], events);
     }
   }
   return state;
@@ -152,6 +164,7 @@ function addStatModifier(
 
 function resolveNormalizedSteps(
   state: GameState,
+  ctx: EffectContext,
   sourceInstanceId: CardInstanceId,
   actingPlayerId: PlayerId,
   steps: readonly EffectSpec[],
@@ -171,13 +184,18 @@ function resolveNormalizedSteps(
       case "DRAW": {
         for (let count = 0; count < step.count; count += 1) {
           const drawnId = next.players[actingPlayerId].deck[0];
-          if (drawnId === undefined) break;
+          if (drawnId === undefined) {
+            // A required draw found no card: process what exists, finish the Effect, then score.
+            ctx.deckExhausted = true;
+            break;
+          }
           next = moveCard(
             next,
             { instanceId: drawnId, fromPlayerId: actingPlayerId, from: "DECK", toPlayerId: actingPlayerId, to: "HAND", reason: "EFFECT_DRAW" },
             events
           );
           events.push({ type: "CARD_DRAWN", playerId: actingPlayerId, instanceId: drawnId });
+          if (next.players[actingPlayerId].deck.length === 0) ctx.deckExhausted = true;
         }
         break;
       }
@@ -242,6 +260,7 @@ function resolveNormalizedSteps(
       case "DISCARD_CHOSEN":
         next = pauseForChoice(
           next,
+          ctx,
           sourceInstanceId,
           actingPlayerId,
           "DISCARD_OWN_HAND",
@@ -255,9 +274,20 @@ function resolveNormalizedSteps(
   }
 
   if (next.pendingResolution !== null) return next;
-  next = checkCapacityAfterEffect(next, sourceInstanceId, actingPlayerId, events);
-  if (next.pendingResolution !== null) return next;
-  return scoreIfDeckExhausted(next, events);
+  return checkCapacityAfterEffect(next, ctx, sourceInstanceId, actingPlayerId, events);
+}
+
+/** The Effect is complete: report it, then apply the §19 end check for this Effect only. */
+function finishEffect(
+  state: GameState,
+  ctx: EffectContext,
+  sourceInstanceId: CardInstanceId,
+  actingPlayerId: PlayerId,
+  events: EngineEvent[]
+): GameState {
+  if (state.pendingResolution !== null) return state;
+  events.push({ type: "EFFECT_RESOLVED", playerId: actingPlayerId, sourceInstanceId });
+  return ctx.deckExhausted ? scoreAndResolveMatch(state, events, "DECK_EXHAUSTED") : state;
 }
 
 export function resolveCardEffect(
@@ -270,10 +300,10 @@ export function resolveCardEffect(
   const definition = instance ? state.cardDefinitions[instance.definitionId] : undefined;
   if (!definition?.effect) return state;
 
+  const ctx: EffectContext = { deckExhausted: false };
   const steps = normalizeSteps(definition.effect);
-  const next = resolveNormalizedSteps(state, sourceInstanceId, actingPlayerId, steps, events);
-  if (next.pendingResolution === null) events.push({ type: "EFFECT_RESOLVED", playerId: actingPlayerId, sourceInstanceId });
-  return next;
+  const next = resolveNormalizedSteps(state, ctx, sourceInstanceId, actingPlayerId, steps, events);
+  return finishEffect(next, ctx, sourceInstanceId, actingPlayerId, events);
 }
 
 export function resolveEffectChoice(
@@ -308,9 +338,7 @@ export function resolveEffectChoice(
     next = removeExcessEffects(next, pending.affectedPlayerId, cardInstanceIds, events);
   }
 
-  next = resolveNormalizedSteps(next, pending.sourceInstanceId, pending.actingPlayerId, pending.remainingSteps, events);
-  if (next.pendingResolution === null) {
-    events.push({ type: "EFFECT_RESOLVED", playerId: pending.actingPlayerId, sourceInstanceId: pending.sourceInstanceId });
-  }
-  return next;
+  const ctx: EffectContext = { deckExhausted: pending.deckExhaustedByEffect };
+  next = resolveNormalizedSteps(next, ctx, pending.sourceInstanceId, pending.actingPlayerId, pending.remainingSteps, events);
+  return finishEffect(next, ctx, pending.sourceInstanceId, pending.actingPlayerId, events);
 }
