@@ -106,6 +106,11 @@ The X1 exit gate in `PHASES_AND_WORKFLOW.md` is satisfied:
 
 X1 is closed. Do not expand the headless engine for optional work before X2. Reopen only for a demonstrated regression or blocker.
 
+### X1.1 (narrow reopen, closed)
+
+- §19 deck-exhaustion timing fixed: an already-empty deck alone never ends the match (D-017). Golden snapshots unchanged.
+- `viewFor` / `eventsFor` added; the X2 renderer boundary is defined and enforced (D-018, ARCHITECTURE.md §21).
+
 ## Branch Workflow
 
 All substantial work happens on branches and merges into `main` (constitution Rule 18).
@@ -115,15 +120,15 @@ All substantial work happens on branches and merges into `main` (constitution Ru
 Per `PHASES_AND_WORKFLOW.md`, X2 is the Local 2D Arena using the existing greybox 2.5D Three.js renderer.
 
 Required work:
-1. render authoritative engine state;
+1. render `viewFor(state, viewerId)`, never `GameState` (ARCHITECTURE.md §21);
 2. provide hand, deck, VS Zone, Effect Zone, Zone X and Zone Tepi views;
-3. expose only legal actions supplied by the engine;
+3. expose only legal actions supplied by `enumerateLegalCommands()`;
 4. implement ATK/DEF position controls;
 5. provide clear turn, round, Arena Collapse, STA and scoring feedback;
-6. keep animation/audio non-authoritative and downstream of committed engine transitions.
+6. keep animation/audio non-authoritative: play `eventsFor(events, viewerId)` in order, then snap to the latest view; never diff states.
 
 Do not start Supabase, networking, AI, cosmetics, progression or monetization during X2.
 
 ## Next Concrete Task
 
-**Wire the existing Three.js greybox client to the X1 engine state and `enumerateLegalCommands()`. Render the six gameplay zones and expose only legal local-player actions; keep all presentation state non-authoritative.**
+**Build the local match host and wire the Three.js greybox renderer to it: the renderer takes `viewFor()`, `enumerateLegalCommands()` and `eventsFor()` only (renderer code lives in `apps/client/src/render/`). Render the six gameplay zones and expose only legal local-player actions.**

@@ -8,7 +8,7 @@
   "scripts": {
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
-    "boundaries": "depcruise packages apps --config .dependency-cruiser.cjs",
+    "boundaries": "depcruise packages apps --config .dependency-cruiser.cjs && node scripts/check-renderer-boundary.mjs",
     "determinism": "node scripts/check-determinism.mjs",
     "build": "pnpm -r build",
     "check": "pnpm typecheck && pnpm test && pnpm boundaries && pnpm determinism && pnpm build",

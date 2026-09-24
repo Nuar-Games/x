@@ -4,7 +4,7 @@
  */
 import type { EngineEvent } from "./commands.ts";
 import { effectiveStat } from "./effects.ts";
-import { scoreIfDeckExhausted } from "./scoring.ts";
+import { scoreAndResolveMatch } from "./scoring.ts";
 import type { CardInstanceId, GameState, PlayerId, VsPosition } from "./state.ts";
 import { moveCard, moveCardsSimultaneously, type MoveCardInput } from "./zones.ts";
 
@@ -36,6 +36,16 @@ export function resolveBattle(state: GameState, attackerId: PlayerId, events: En
   const attackerAtk = effectiveStat(state, attacker.id, "ATK");
   const defenderStat = defender.position === "ATK" ? "ATK" : "DEF";
   const defenderValue = effectiveStat(state, defender.id, defenderStat);
+
+  /**
+   * GAME_RULES.md §19: the battle ends the match only if its own top-deck
+   * operation found no card, or took the last card of a deck. An already-empty
+   * deck that this battle did not need never ends the match.
+   */
+  const endIfThisBattleExhausted = (next: GameState, requiredMissing: boolean, touched: readonly PlayerId[]): GameState => {
+    const emptied = touched.some((playerId) => state.players[playerId].deck.length > 0 && next.players[playerId].deck.length === 0);
+    return requiredMissing || emptied ? scoreAndResolveMatch(next, events, "DECK_EXHAUSTED") : next;
+  };
 
   const report = (outcome: BattleOutcome) =>
     events.push({ type: "BATTLE_RESOLVED", attackerId, defenderId, attackerAtk, defenderStat, defenderValue, outcome });
@@ -73,7 +83,7 @@ export function resolveBattle(state: GameState, attackerId: PlayerId, events: En
         events
       );
     }
-    return scoreIfDeckExhausted(next, events);
+    return endIfThisBattleExhausted(next, captured === undefined, [defenderId]);
   }
 
   if (attackerAtk === defenderValue) {
@@ -88,7 +98,7 @@ export function resolveBattle(state: GameState, attackerId: PlayerId, events: En
       moves.push({ instanceId: defenderTop, fromPlayerId: defenderId, from: "DECK", toPlayerId: defenderId, to: "ZONE_TEPI", reason: "BATTLE_TOP_DECK_DISCARD" });
     }
     const next = moves.length > 0 ? moveCardsSimultaneously(state, moves, events) : state;
-    return scoreIfDeckExhausted(next, events);
+    return endIfThisBattleExhausted(next, attackerTop === undefined || defenderTop === undefined, [attackerId, defenderId]);
   }
 
   report("ATTACKER_BLOCKED_BY_DEF");
@@ -101,5 +111,5 @@ export function resolveBattle(state: GameState, attackerId: PlayerId, events: En
       events
     );
   }
-  return scoreIfDeckExhausted(next, events);
+  return endIfThisBattleExhausted(next, discarded === undefined, [attackerId]);
 }
