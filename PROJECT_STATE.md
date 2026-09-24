@@ -131,4 +131,6 @@ Do not start Supabase, networking, AI, cosmetics, progression or monetization du
 
 ## Next Concrete Task
 
-**Build the local match host and wire the Three.js greybox renderer to it: the renderer takes `viewFor()`, `enumerateLegalCommands()` and `eventsFor()` only (renderer code lives in `apps/client/src/render/`). Render the six gameplay zones and expose only legal local-player actions.**
+**X2 step 2 — static renderer:** render both players' six zones plus turn, round, score, STA and Arena Collapse information from `HostOutput` / `PlayerView` only, with no animation yet (renderer code lives in `apps/client/src/render/`). Then run the agreed renderer-boundary audit checkpoint.
+
+X2 step 1 (local match host, D-019) is complete.
