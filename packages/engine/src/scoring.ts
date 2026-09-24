@@ -58,10 +58,3 @@ export function scoreAndResolveMatch(state: GameState, events: EngineEvent[], re
   events.push({ type: "MATCH_ENDED", reason, winner, p1Score: p1, p2Score: p2 });
   return { ...next, status: "RESOLVED", winner };
 }
-
-/** §19 deck-empty check at an established resolution boundary. */
-export function scoreIfDeckExhausted(state: GameState, events: EngineEvent[]): GameState {
-  if (state.status !== "ACTIVE") return state;
-  if (state.players.P1.deck.length > 0 && state.players.P2.deck.length > 0) return state;
-  return scoreAndResolveMatch(state, events, "DECK_EXHAUSTED");
-}
