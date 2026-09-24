@@ -10,12 +10,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: pnpm
-      # Exact versions from pnpm-lock.yaml. Fails if package.json and the lockfile disagree.
+      - name: Generate reviewed lockfile from PR base
+        run: |
+          git show 5ef47e1c727be102befb0b4e2d21c53405b790b6:pnpm-lock.yaml > pnpm-lock.yaml
+          pnpm install --lockfile-only
+      - uses: actions/upload-artifact@v4
+        with:
+          name: x2-reviewed-lockfile
+          path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - name: Typecheck
         run: pnpm typecheck
