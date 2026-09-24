@@ -1,4 +1,4 @@
-import { fullSet } from "../../../../packages/cards/src/index.ts";
+import { fullSet } from "@x/cards";
 import type { MatchSetupInput } from "@x/engine";
 
 export const SUPPORTED_LOCAL_CARD_IDS = [
