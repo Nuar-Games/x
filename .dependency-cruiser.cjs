@@ -23,14 +23,42 @@ module.exports = {
       comment: "AI may only use the engine's public API.",
       severity: "error",
       from: { path: "^packages/ai/src" },
-      to: { pathNot: ["^packages/ai/src", "^packages/engine/src/index\.ts$"] }
+      to: { pathNot: ["^packages/ai/src", "^packages/engine/src/index\\.ts$"] }
     },
     {
       name: "client-uses-engine-public-api",
       comment: "The client may only use the engine's public entry point, never its internals.",
       severity: "error",
       from: { path: "^apps/client" },
-      to: { path: "^packages/engine/src", pathNot: "^packages/engine/src/index\.ts$" }
+      to: { path: "^packages/engine/src", pathNot: "^packages/engine/src/index\\.ts$" }
+    },
+    {
+      name: "host-does-not-import-three",
+      comment: "The local match host is browser/render independent.",
+      severity: "error",
+      from: { path: "^apps/client/src/host(?:/|$)" },
+      to: { path: "^(?:node_modules/)?three(?:/|$)" }
+    },
+    {
+      name: "host-does-not-import-renderer",
+      comment: "The local match host may not depend on renderer code.",
+      severity: "error",
+      from: { path: "^apps/client/src/host(?:/|$)" },
+      to: { path: "^apps/client/src/render(?:/|$)" }
+    },
+    {
+      name: "host-does-not-import-card-data",
+      comment: "Card/config data stays outside host; setup is supplied externally.",
+      severity: "error",
+      from: { path: "^apps/client/src/host(?:/|$)" },
+      to: { path: "^packages/cards(?:/|$)" }
+    },
+    {
+      name: "renderer-does-not-import-host",
+      comment: "Renderer consumes host output through its caller, never host internals.",
+      severity: "error",
+      from: { path: "^apps/client/src/render(?:/|$)" },
+      to: { path: "^apps/client/src/host(?:/|$)" }
     },
     {
       name: "nobody-imports-client",
@@ -43,8 +71,8 @@ module.exports = {
       name: "setup-core-is-private",
       comment: "Only setup.ts may use the shared setup core, so the test-only deck exception cannot reach production code (D-010).",
       severity: "error",
-      from: { path: "^packages/engine/src", pathNot: "^packages/engine/src/(setup\.ts|internal/)" },
-      to: { path: "^packages/engine/src/internal/setup-core\.ts$" }
+      from: { path: "^packages/engine/src", pathNot: "^packages/engine/src/(setup\\.ts|internal/)" },
+      to: { path: "^packages/engine/src/internal/setup-core\\.ts$" }
     },
     {
       name: "no-circular",

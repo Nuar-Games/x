@@ -1,9 +1,9 @@
 // Constitution Rule 5 / ARCHITECTURE.md §15:
-// gameplay randomness and time must not leak into the engine.
-import { readdirSync, readFileSync, statSync } from "node:fs";
+// gameplay randomness and time must not leak into the engine, AI, or host.
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-const ROOTS = ["packages/engine/src", "packages/ai/src"];
+const ROOTS = ["packages/engine/src", "packages/ai/src", "apps/client/src/host"];
 const BANNED = [
   { pattern: /\bMath\.random\b/, why: "use the engine's seeded RNG" },
   { pattern: /\bDate\.now\b/, why: "time must not affect game results" },
@@ -21,6 +21,7 @@ function walk(dir) {
 
 const failures = [];
 for (const root of ROOTS) {
+  if (!existsSync(root)) continue;
   for (const file of walk(root).filter((f) => /\.(ts|js|mjs)$/.test(f))) {
     readFileSync(file, "utf8").split("\n").forEach((line, i) => {
       for (const { pattern, why } of BANNED) {
