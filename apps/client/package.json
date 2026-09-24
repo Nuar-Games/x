@@ -10,6 +10,7 @@
     "build": "vite build"
   },
   "dependencies": {
+    "@x/cards": "workspace:*",
     "@x/engine": "workspace:*",
     "three": "^0.170.0"
   },
