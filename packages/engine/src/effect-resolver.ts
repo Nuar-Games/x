@@ -1,6 +1,7 @@
 import type { EngineEvent } from "./commands.ts";
 import { effectiveStat, removeExcessEffects, requiredExcessEffectCount } from "./effects.ts";
 import { opponentOf } from "./internal/turn-helpers.ts";
+import { scoreIfDeckExhausted } from "./scoring.ts";
 import type {
   CardInstanceId,
   EffectSpec,
@@ -170,7 +171,7 @@ function resolveNormalizedSteps(
       case "DRAW": {
         for (let count = 0; count < step.count; count += 1) {
           const drawnId = next.players[actingPlayerId].deck[0];
-          if (drawnId === undefined) throw new Error("deck exhaustion during Effect resolution is not implemented yet (X1 step 14)");
+          if (drawnId === undefined) break;
           next = moveCard(
             next,
             { instanceId: drawnId, fromPlayerId: actingPlayerId, from: "DECK", toPlayerId: actingPlayerId, to: "HAND", reason: "EFFECT_DRAW" },
@@ -254,7 +255,9 @@ function resolveNormalizedSteps(
   }
 
   if (next.pendingResolution !== null) return next;
-  return checkCapacityAfterEffect(next, sourceInstanceId, actingPlayerId, events);
+  next = checkCapacityAfterEffect(next, sourceInstanceId, actingPlayerId, events);
+  if (next.pendingResolution !== null) return next;
+  return scoreIfDeckExhausted(next, events);
 }
 
 export function resolveCardEffect(

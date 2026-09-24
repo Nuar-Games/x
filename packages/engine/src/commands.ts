@@ -103,6 +103,8 @@ export type MoveReason =
   | "EFFECT_DISCARD"
   | "EFFECT_DESTROYED";
 
+export type MatchEndReason = "DECK_EXHAUSTED";
+
 export type RejectionCode =
   | "MATCH_NOT_ACTIVE"
   | "NOT_ACTIVE_PLAYER"
@@ -187,6 +189,16 @@ export type EngineEvent =
   | { readonly type: "EFFECT_CHOICE_REQUIRED"; readonly playerId: PlayerId; readonly sourceInstanceId: CardInstanceId; readonly count: number }
   | { readonly type: "EFFECT_RESOLVED"; readonly playerId: PlayerId; readonly sourceInstanceId: CardInstanceId }
   | { readonly type: "EFFECT_REMOVED"; readonly playerId: PlayerId; readonly instanceId: CardInstanceId }
+  | { readonly type: "SCORE_CALCULATED"; readonly p1: number; readonly p2: number }
+  | {
+      readonly type: "TIE_BREAK_REVEALED";
+      readonly index: number;
+      readonly p1InstanceId: CardInstanceId;
+      readonly p1Atk: number;
+      readonly p2InstanceId: CardInstanceId;
+      readonly p2Atk: number;
+    }
+  | { readonly type: "MATCH_ENDED"; readonly reason: MatchEndReason; readonly winner: PlayerId | "DRAW"; readonly p1Score: number; readonly p2Score: number }
   | { readonly type: "STAGE_CHANGED"; readonly playerId: PlayerId; readonly from: TurnStage; readonly to: TurnStage }
   | { readonly type: "TURN_ENDED"; readonly playerId: PlayerId; readonly turnNumber: number };
 

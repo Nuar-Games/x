@@ -13,6 +13,7 @@ import { playEffect, removeOwnEffect, resolveEffectChoice } from "./handlers/eff
 import { discardForHandLimit } from "./handlers/hand.ts";
 import { handLimitFor, isOpeningTurn } from "./hand-limit.ts";
 import { opponentOf, setStage, type HandlerResult } from "./internal/turn-helpers.ts";
+import { scoreAndResolveMatch } from "./scoring.ts";
 import type { GameState, PlayerState, TurnStage } from "./state.ts";
 import { moveCard, moveCardsSimultaneously, type MoveCardInput } from "./zones.ts";
 
@@ -31,10 +32,7 @@ function runTurnStartDraw(state: GameState, events: EngineEvent[]): GameState {
   events.push({ type: "TURN_STARTED", playerId, turnNumber: state.turnNumber, isOpeningTurn: isOpeningTurn(started) });
 
   const drawnId = started.deck[0];
-  if (drawnId === undefined) {
-    // GAME_RULES.md §19: an empty deck at the normal draw ends the match. X1 step 14.
-    throw new Error("deck exhaustion at turn-start draw is not implemented yet (X1 step 14)");
-  }
+  if (drawnId === undefined) return scoreAndResolveMatch(next, events, "DECK_EXHAUSTED");
 
   next = moveCard(next, { instanceId: drawnId, fromPlayerId: playerId, from: "DECK", toPlayerId: playerId, to: "HAND", reason: "DRAW" }, events);
   events.push({ type: "CARD_DRAWN", playerId, instanceId: drawnId });
@@ -179,6 +177,7 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
 
   const handled = runHandler(state, command);
   if (!handled.accepted) return { accepted: false, state, code: handled.code };
+  if (handled.state.status !== "ACTIVE") return { accepted: true, state: handled.state, events: handled.events };
 
   const events: EngineEvent[] = [...handled.events];
   const settled = endTurnIfActivePlayerLostVs(handled.state, events);
