@@ -291,3 +291,35 @@ Decision (from the step 13 audit):
 2. **Real-card tests.** All 10 engine-proof cards run through `applyCommand` using the real card data, with a coverage test.
 3. **KAPORES order.** STA 0 destruction stays immediate; the capacity check runs once after all instructions of the effect.
 4. **Monotonic modifier ids** (`modifierSequence`), never reused after removal.
+
+---
+
+## D-017 — X1.1: §19 Deck Exhaustion Timing
+
+Status: **ACTIVE**
+
+Problem found at the X1 exit-gate audit:
+
+After every Effect and every DEF battle, the engine ended the match if **either** deck was empty, even if that Effect or battle did not touch a deck. Drawing your last card normally and then playing SINGAU ended the match.
+
+Decision (GAME_RULES.md §19 unchanged; the engine now matches it):
+
+- **Normal draw:** the match ends only when the required draw cannot happen.
+- **Effect:** the match ends only if that Effect emptied a deck or needed a deck card that was missing. The Effect finishes first (including any pending choice), `EFFECT_RESOLVED` is emitted, then the match is scored. The flag survives a paused choice (`deckExhaustedByEffect`).
+- **Battle:** the match ends only if that battle's own top-deck operation took the last card of a deck or needed a missing top-deck card.
+- An already-empty deck by itself never ends the match.
+
+Golden matches were rerun after the fix. None of their frozen snapshots changed, so no snapshot was updated.
+
+---
+
+## D-018 — X1.1: Per-Player Views and the X2 Renderer Boundary
+
+Status: **ACTIVE**
+
+Decision:
+
+- `viewFor(state, viewerId)` returns a `PlayerView`: own hand with identities; opponent hand as a count; both decks as counts; VS, Effect Zones, Zone X, Zone Tepi, effective stats, scores, turn, round, Arena Collapse, status and pending-choice data as public information. Deterministic, pure, JSON-serializable.
+- `eventsFor(events, viewerId)` returns the event stream as that player may see it: a card that stays hidden on both ends of a move (e.g. the opponent drawing) keeps its zones and reason but has `instanceId: null`. A card that becomes public keeps its identity.
+- A whole-match test checks, after every command, that neither player's view nor filtered events contain any opponent-hand or deck instance id.
+- X2 renderer inputs are exactly `viewFor`, `enumerateLegalCommands` and `eventsFor` (ARCHITECTURE.md §21), enforced by `scripts/check-renderer-boundary.mjs`.
